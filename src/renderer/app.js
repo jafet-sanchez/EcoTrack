@@ -534,7 +534,7 @@ function loadRegistrosDisponiblesAgrupados() {
     
     container.innerHTML = '';
     
-    // NUEVO: Calcular peso disponible para cada registro
+    // CALCULAR PESO DISPONIBLE CORRECTAMENTE
     const registrosConPesoDisponible = registrosData.map(registro => {
         if (registro.Estado === 'Despachado') {
             return { ...registro, PesoDisponible: 0 };
@@ -545,40 +545,32 @@ function loadRegistrosDisponiblesAgrupados() {
         
         // Buscar en todas las salidas
         salidasData.forEach(salida => {
-            // Si tiene información de parciales
-            if (salida.RegistrosParciales) {
+            // Buscar en RegistrosParciales (información más precisa)
+            if (salida.RegistrosParciales && salida.RegistrosParciales.length > 0) {
                 const parcial = salida.RegistrosParciales.find(p => p.id === registro.ID);
                 if (parcial) {
                     pesoDespachado += parseFloat(parcial.pesoDespachado) || 0;
                 }
-            } 
-            // También revisar en Detalle_Grupos
+            }
+            // Si no hay RegistrosParciales, buscar en Detalle_Grupos
             else if (salida.Detalle_Grupos) {
                 salida.Detalle_Grupos.forEach(grupo => {
                     if (grupo.ids && grupo.ids.includes(registro.ID)) {
-                        // Si es un despacho parcial con proporción
-                        if (grupo.proporcionDespachada && grupo.proporcionDespachada < 1) {
-                            const pesoGrupoPorRegistro = grupo.peso / grupo.ids.length;
-                            pesoDespachado += pesoGrupoPorRegistro;
-                        }
-                        // Si es despacho completo del grupo
-                        else if (!grupo.proporcionDespachada || grupo.proporcionDespachada === 1) {
-                            // Solo contar si ya está marcado como despachado
-                            if (registro.Estado === 'Despachado') {
-                                pesoDespachado = registro.Peso; // Todo el peso
-                            }
-                        }
+                        // Calcular peso despachado por este registro
+                        const pesoGrupoPorRegistro = grupo.peso / grupo.ids.length;
+                        pesoDespachado += pesoGrupoPorRegistro;
                     }
                 });
             }
         });
         
-        // Calcular peso disponible = Peso original - Peso ya despachado
-        const pesoDisponible = Math.max(0, registro.Peso - pesoDespachado);
+        // IMPORTANTE: Usar el peso original del registro, NO el peso ya modificado
+        const pesoOriginal = registro.PesoOriginal || registro.Peso;
+        const pesoDisponible = Math.max(0, pesoOriginal - pesoDespachado);
         
         return { 
             ...registro, 
-            PesoOriginal: registro.Peso,
+            PesoOriginal: pesoOriginal,
             PesoDisponible: pesoDisponible,
             PesoDespachado: pesoDespachado
         };
@@ -589,7 +581,7 @@ function loadRegistrosDisponiblesAgrupados() {
         r.Estado === 'Activo' && r.PesoDisponible > 0
     );
     
-    // MODIFICAR: Agrupar usando peso disponible en lugar del peso original
+    // Agrupar usando peso disponible
     const grupos = {};
     registrosActivos.forEach(registro => {
         if (!grupos[registro.Tipo]) {
@@ -606,7 +598,7 @@ function loadRegistrosDisponiblesAgrupados() {
         grupos[registro.Tipo].registros.push(registro);
         grupos[registro.Tipo].ids.push(registro.ID);
         grupos[registro.Tipo].pesoTotal += registro.PesoDisponible; // Usar peso disponible
-        grupos[registro.Tipo].pesoOriginalTotal += registro.PesoOriginal; // Guardar también el original
+        grupos[registro.Tipo].pesoOriginalTotal += registro.PesoOriginal;
         grupos[registro.Tipo].cantidad++;
         
         if (!grupos[registro.Tipo].personas.includes(registro.Persona)) {
@@ -614,7 +606,7 @@ function loadRegistrosDisponiblesAgrupados() {
         }
     });
     
-    // Obtener registros despachados (se muestran individualmente)
+    // Mostrar registros despachados
     const registrosDespachados = registrosConPesoDisponible.filter(r => r.Estado === 'Despachado');
     
     if (Object.keys(grupos).length === 0 && registrosDespachados.length === 0) {
@@ -624,26 +616,11 @@ function loadRegistrosDisponiblesAgrupados() {
     
     // Mostrar grupos de registros activos con peso disponible
     Object.entries(grupos).forEach(([tipo, grupo]) => {
-        // Si hay despachos parciales, mostrar info adicional
-        let tieneParciales = false;
-        grupo.registros.forEach(reg => {
-            if (reg.PesoDespachado > 0) {
-                tieneParciales = true;
-            }
-        });
-        
-        // Crear elemento con información de peso disponible
         const grupoElement = createGrupoDisponibleItem(tipo, grupo);
-        
-        // Si hay parciales, agregar indicador visual
-        if (tieneParciales) {
-            grupoElement.classList.add('border-yellow-500');
-        }
-        
         container.appendChild(grupoElement);
     });
     
-    // Mostrar registros despachados individualmente 
+    // Mostrar registros despachados
     if (registrosDespachados.length > 0) {
         const separador = document.createElement('div');
         separador.className = 'border-t border-gray-500 my-3 pt-3';
@@ -656,9 +633,174 @@ function loadRegistrosDisponiblesAgrupados() {
         });
     }
     
-    // Agregar información de debug en consola
     console.log('📊 Registros con peso disponible:', registrosConPesoDisponible);
     console.log('📦 Grupos formados:', grupos);
+}
+
+/**
+ * Cargar registros disponibles agrupados por tipo para salida (FUNCIÓN PRINCIPAL)
+ */
+async function procesarSalidaGrupalConPesosPersonalizados(registrosSeleccionados, gruposSeleccionados) {
+    showLoading('Procesando salida con pesos personalizados...');
+
+    try {
+        const salidaData = {
+            registrosIds: registrosSeleccionados,
+            grupos: gruposSeleccionados,
+            fechaSalida: document.getElementById('fecha-salida').value,
+            personaAutoriza: document.getElementById('persona-autoriza').value,
+            observaciones: document.getElementById('observaciones-salida').value
+        };
+
+        console.log('📤 Procesando salida con pesos personalizados:', salidaData);
+
+        const registrosModificados = [];
+        const registrosParcialesInfo = [];
+
+        // Procesar cada grupo
+        gruposSeleccionados.forEach(grupo => {
+            grupo.registros.forEach(registro => {
+                // IMPORTANTE: Calcular pesos correctamente
+                const pesoOriginal = registro.PesoOriginal || registro.Peso;
+                const disponibleAntes = registro.PesoDisponible ?? pesoOriginal;
+
+                let pesoDespachado;
+                if (grupo.proporcionDespachada && grupo.proporcionDespachada < 1) {
+                    pesoDespachado = disponibleAntes * grupo.proporcionDespachada;
+                } else {
+                    pesoDespachado = Math.min(disponibleAntes, grupo.peso / grupo.registros.length);
+                }
+                
+                const pesoRestante = disponibleAntes - pesoDespachado;
+                
+                
+                
+                registrosParcialesInfo.push({
+                    id: registro.ID,
+                    pesoOriginal: pesoOriginal,
+                    pesoDespachado: pesoDespachado,
+                    pesoRestante: pesoRestante
+                });
+                
+                // Actualizar estado del registro
+                const reg = registrosData.find(r => r.ID === registro.ID);
+                if (reg) {
+                    if (pesoRestante > 0) {
+                        reg.Estado = 'Activo';
+                        // MANTENER el peso original, no modificarlo
+                        reg.PesoOriginal = pesoOriginal;
+                        registrosModificados.push({
+                            id: reg.ID,
+                            mantenerActivo: true,
+                            pesoRestante: pesoRestante
+                        });
+                    } else {
+                        reg.Estado = 'Despachado';
+                        registrosModificados.push({
+                            id: reg.ID,
+                            mantenerActivo: false,
+                            pesoRestante: 0
+                        });
+                    }
+                }
+            });
+        });
+
+        // Crear registro de salida
+        const nuevaSalida = {
+            ID_Salida: getNextSalidaId(),
+            Fecha_Despacho: salidaData.fechaSalida,
+            Persona_Autoriza: salidaData.personaAutoriza,
+            Registros_Procesados: registrosSeleccionados.length,
+            Grupos_Procesados: gruposSeleccionados.length,
+            Tipos_Despachados: gruposSeleccionados.map(g => g.tipo).join(', '),
+            Peso_Total_Despachado: gruposSeleccionados.reduce((sum, g) => sum + g.peso, 0),
+            Observaciones: salidaData.observaciones,
+            Detalle_Grupos: gruposSeleccionados.map(grupo => ({
+                tipo: grupo.tipo,
+                cantidad: grupo.cantidad,
+                peso: grupo.peso,
+                pesoOriginal: grupo.pesoOriginal,
+                ids: grupo.ids,
+                personas: grupo.personas || [],
+                proporcionDespachada: grupo.proporcionDespachada
+            })),
+            RegistrosParciales: registrosParcialesInfo
+        };
+
+        console.log('Nueva salida creada:', nuevaSalida);
+        console.log('Registros parciales:', registrosParcialesInfo);
+
+        // Enviar a Excel
+        if (window.electronAPI) {
+            const result = await window.electronAPI.procesarSalidaConParciales({
+                salida: nuevaSalida,
+                registrosModificados: registrosModificados,
+                registrosParcialesInfo: registrosParcialesInfo
+            });
+
+            if (result.success) {
+                console.log('✅ Salida procesada en Excel con parciales');
+            }
+
+            // Recargar datos desde Excel
+            const loadResult = await window.electronAPI.loadDataFromExcel();
+            if (loadResult.success && loadResult.data) {
+                registrosData.length = 0;
+                registrosData.push(...(loadResult.data.registros || []));
+                
+                salidasData.length = 0;
+                salidasData.push(...(loadResult.data.salidas || []));
+                
+                // Asegurar que RegistrosParciales se preserve
+                salidasData.forEach(salida => {
+                    if (!salida.RegistrosParciales && salida.Detalle_Grupos) {
+                        salida.RegistrosParciales = [];
+                        salida.Detalle_Grupos.forEach(grupo => {
+                            const pesoPorRegistro = grupo.peso / grupo.ids.length;
+                            grupo.ids.forEach(id => {
+                                salida.RegistrosParciales.push({
+                                    id: id,
+                                    pesoDespachado: pesoPorRegistro
+                                });
+                            });
+                        });
+                    }
+                });
+            }
+        } else {
+            // Sin Excel, actualizar solo memoria
+            salidasData.push(nuevaSalida);
+        }
+
+        hideLoading();
+
+        const pesoTotal = gruposSeleccionados.reduce((sum, g) => sum + g.peso, 0);
+        let successMessage = `Salida #${nuevaSalida.ID_Salida} procesada:\n`;
+        successMessage += `• ${pesoTotal.toFixed(1)}kg despachados`;
+        
+        const registrosConRestante = registrosModificados.filter(r => r.mantenerActivo);
+        if (registrosConRestante.length > 0) {
+            successMessage += `\n• ${registrosConRestante.length} registro(s) con peso restante activo`;
+        }
+
+        showToast('Éxito', successMessage, 'success');
+
+        updateDashboard();
+        loadSalidasData();
+        
+        if (currentSection === 'historial') {
+            loadHistorialData();
+        }
+
+        document.getElementById('form-salida').reset();
+        setupDateTimeInputs();
+        
+    } catch (error) {
+        hideLoading();
+        console.error('❌ Error al procesar salida:', error);
+        showToast('Error', 'Ocurrió un error al procesar la salida', 'error');
+    }
 }
 
 /**
@@ -842,11 +984,8 @@ function createSalidaRowDetallada(salida) {
  * Mostrar detalles de una salida grupal
  */
 function mostrarDetallesSalida(salida) {
-    // PRUEBA
     console.log('Datos de salida recibidos:', salida);
-    console.log('ID_Salida:', salida.ID_Salida);
-    console.log('Detalle_Grupos:', salida.Detalle_Grupos);
-     // Verificar que la salida tenga la estructura esperada
+    
     if (!salida || !salida.ID_Salida) {
         showToast('Error', 'Datos de salida no válidos', 'error');
         return;
@@ -864,13 +1003,18 @@ function mostrarDetallesSalida(salida) {
             </div>
     `;
     
+    // Mostrar el peso total despachado si está disponible
+    if (salida.Peso_Total_Despachado) {
+        detalleHTML += `<div class="mt-2"><strong class="text-orange-400">Peso Total Despachado:</strong> ${salida.Peso_Total_Despachado.toFixed(1)}kg</div>`;
+    }
+    
     if (salida.Observaciones) {
         detalleHTML += `<div class="mt-2"><strong class="text-gray-400">Observaciones:</strong> ${salida.Observaciones}</div>`;
     }
     
     detalleHTML += '</div>';
     
-    // Solo mostrar grupos si existen
+    // Mostrar grupos con el peso REALMENTE despachado
     if (salida.Detalle_Grupos && salida.Detalle_Grupos.length > 0) {
         detalleHTML += '<h5 class="font-semibold text-lg text-white mb-3">🎯 Grupos Despachados:</h5>';
         
@@ -878,6 +1022,15 @@ function mostrarDetallesSalida(salida) {
             const personas = grupo.personas && grupo.personas.length > 0 
                 ? grupo.personas.join(', ') 
                 : 'No especificado';
+            
+            // IMPORTANTE: Usar el peso del grupo que fue despachado, no el peso original
+            let pesoDespachado = grupo.peso;
+            let textoProporcion = '';
+            
+            // Si hay información de proporción, mostrarla
+            if (grupo.proporcionDespachada && grupo.proporcionDespachada < 1) {
+                textoProporcion = ` (${(grupo.proporcionDespachada * 100).toFixed(0)}% del disponible)`;
+            }
             
             detalleHTML += `
                 <div class="bg-gray-700 border-l-4 border-blue-500 p-4 rounded-r-lg">
@@ -889,7 +1042,10 @@ function mostrarDetallesSalida(salida) {
                                 ${grupo.cantidad} ${grupo.cantidad === 1 ? 'registro' : 'registros'}
                             </span>
                         </div>
-                        <span class="text-yellow-400 font-bold text-xl">${(grupo.peso || 0).toFixed(1)}kg</span>
+                        <div class="text-right">
+                            <span class="text-yellow-400 font-bold text-xl">${pesoDespachado.toFixed(1)}kg</span>
+                            <span class="text-gray-400 text-sm">${textoProporcion}</span>
+                        </div>
                     </div>
                     <div class="text-sm text-gray-300 space-y-2">
                         <div class="flex items-center">
@@ -902,6 +1058,43 @@ function mostrarDetallesSalida(salida) {
                             <strong>Personas:</strong> 
                             <span class="ml-2">${personas}</span>
                         </div>
+                    </div>
+                </div>
+            `;
+        });
+    } else if (salida.RegistrosParciales && salida.RegistrosParciales.length > 0) {
+        // Si no hay Detalle_Grupos pero sí RegistrosParciales, mostrar esa información
+        detalleHTML += '<h5 class="font-semibold text-lg text-white mb-3">📋 Registros Despachados:</h5>';
+        
+        // Agrupar por tipo si es necesario
+        const registrosPorTipo = {};
+        salida.RegistrosParciales.forEach(parcial => {
+            // Buscar el registro original para obtener el tipo
+            const registro = registrosData.find(r => r.ID === parcial.id);
+            const tipo = registro ? registro.Tipo : 'Desconocido';
+            
+            if (!registrosPorTipo[tipo]) {
+                registrosPorTipo[tipo] = {
+                    tipo: tipo,
+                    registros: [],
+                    pesoTotal: 0
+                };
+            }
+            
+            registrosPorTipo[tipo].registros.push(parcial);
+            registrosPorTipo[tipo].pesoTotal += parseFloat(parcial.pesoDespachado) || 0;
+        });
+        
+        Object.values(registrosPorTipo).forEach(grupo => {
+            detalleHTML += `
+                <div class="bg-gray-700 border-l-4 border-green-500 p-4 rounded-r-lg mb-2">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">${getTipoIcon(grupo.tipo)}</span>
+                            <span class="font-bold text-white">${grupo.tipo}</span>
+                            <span class="ml-3 text-sm text-gray-400">${grupo.registros.length} registro(s)</span>
+                        </div>
+                        <span class="text-yellow-400 font-bold">${grupo.pesoTotal.toFixed(1)}kg despachados</span>
                     </div>
                 </div>
             `;

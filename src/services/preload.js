@@ -400,22 +400,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
             data.registros = data.registros.map(registro => {
                 const pesoDespachado = pesosDespachados[registro.ID] || 0;
                 const pesoOriginal = registro.Peso;
-                const pesoDisponible = Math.max(0, pesoOriginal - pesoDespachado);
+                const pesoDisponible = Math.max(0, pesoOriginal - pesoDespachado);// hasta aqui
                 
                     
                 // Mantener el peso original y agregar campos adicionales
                 return {
                     ...registro,
+                    Peso: pesoOriginal, // cambie esto
                     PesoOriginal: pesoOriginal,
                     PesoDisponible: pesoDisponible,
                     PesoDespachado: pesoDespachado,
-                    // MANTENER EL PESO ORIGINAL SIEMPRE
-                    Peso: pesoOriginal,
-                    // Solo cambiar estado si está completamente despachado
                     Estado: pesoDespachado >= pesoOriginal 
-                    ? 'Despachado' 
-                    : (registro.Estado || 'Activo')
+                           ? 'Despachado' 
+                           : (registro.Estado || 'Activo')
                 };
+                
             });
             
             // Agrupar salidas por ID_Salida
