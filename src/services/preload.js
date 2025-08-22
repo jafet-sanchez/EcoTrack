@@ -1,14 +1,37 @@
 console.log('🚀 PRELOAD.JS CARGÁNDOSE...');
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRendere } = require('electron');
 const path = require('path');
 const os = require('os');
 
 console.log('🔧 Preload script iniciando...');
 
+// Función para detectar la ruta apropiada
+function getAppPath() {
+    const fs = require('fs');
+    
+    // Ruta principal de OneDrive Coats
+    const oneDrivePath = 'C:\\Users\\COPEJArangoParra\\OneDrive - Coats\\APLICACION\\ECOTRACK';
+    
+    // Verificar si existe la ruta de OneDrive
+    if (fs.existsSync(oneDrivePath)) {
+        console.log('✅ Usando OneDrive Coats:', oneDrivePath);
+        return oneDrivePath;
+    }
+    
+    // Para desarrollo: usar Documents local
+    const devPath = path.join(os.homedir(), 'Documents', 'ECOTRACK_DEV');
+    if (!fs.existsSync(devPath)) {
+        fs.mkdirSync(devPath, { recursive: true });
+    }
+    console.log('🔧 Modo desarrollo - Usando:', devPath);
+    return devPath;
+}
+
 // Configuración de Excel
 const EXCEL_CONFIG = {
     fileName: 'Reciclaje_Database.xlsx',
-    defaultPath: path.join(os.homedir(), 'Documents'),
+    //defaultPath: path.join(os.homedir(), 'Documents'),
+    defaultPath: 'C:\\Users\\COPEJArangoParra\\OneDrive - Coats\\APLICACION\\ECOTRACK',
     sheets: {
         registros: 'Registros_Reciclaje',
         salidas: 'Salidas_Despachos'
@@ -57,11 +80,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 return { success: false, message: 'No se puede acceder al sistema de archivos' };
             }
             
-            // Crear directorio si no existe
+            // Verificar y crear directorio con mejor manejo de errores
             const dir = EXCEL_CONFIG.defaultPath;
-            if (!fs.existsSync(dir)) {
-                console.log('📁 Creando directorio:', dir);
-                fs.mkdirSync(dir, { recursive: true });
+            try {
+                if (!fs.existsSync(dir)) {
+                    console.log('📁 Intentando crear directorio en OneDrive:', dir);
+                    fs.mkdirSync(dir, { recursive: true });
+                    console.log('✅ Directorio creado exitosamente');
+                }  else {
+                    console.log('✅ Directorio OneDrive encontrado:', dir);
+                }
+    
+                // Verificar permisos de escritura
+                fs.accessSync(dir, fs.constants.W_OK);
+                console.log('✅ Permisos de escritura confirmados');
+    
+            } catch (dirError) {
+               console.error('❌ Error con el directorio:', dirError.message);
+    
+               // Si falla, intentar con Documents como respaldo
+               const fallbackDir = path.join(os.homedir(), 'Documents', 'ECOTRACK_LOCAL');
+               if (!fs.existsSync(fallbackDir)) {
+                    fs.mkdirSync(fallbackDir, { recursive: true });
+                }
+                    EXCEL_CONFIG.defaultPath = fallbackDir;
+                    console.warn('⚠️ Usando directorio de respaldo:', fallbackDir);
             }
             
             const defaultFilePath = path.join(EXCEL_CONFIG.defaultPath, EXCEL_CONFIG.fileName);
@@ -122,25 +165,44 @@ contextBridge.exposeInMainWorld('electronAPI', {
     async saveNewRegistro(registroData) {
         try {
             console.log('💾 Guardando registro:', registroData.ID);
-            
+        
             if (!isExcelLoaded || !excelWorkbook) {
                 console.warn('⚠️ Excel no está cargado');
                 return { success: false, message: 'Excel no está cargado' };
             }
 
-            const XLSX = getXLSX();
-            if (!XLSX) {
+           const XLSX = getXLSX();
+           const fs = getFS();
+         
+           if (!XLSX || !fs) {
                 return { success: false, message: 'XLSX no disponible' };
             }
-            
-            // Obtener hoja de registros
+        
+            // Verificar si el archivo está abierto en Excel
+           const lockFile = currentExcelPath.replace('.xlsx', '.~lock');
+           const tempFile = path.join(path.dirname(currentExcelPath), '~$' + path.basename(currentExcelPath));
+        
+           if (fs.existsSync(tempFile) || fs.existsSync(lockFile)) {
+                 return { 
+                   success: false, 
+                   message: '⚠️ El archivo está abierto en Excel. Por favor ciérralo e intenta de nuevo.' 
+                };
+            }
+        
+            // Recargar archivo para obtener últimos cambios
+            try {
+                excelWorkbook = XLSX.readFile(currentExcelPath);
+                console.log('📖 Archivo sincronizado');
+            } catch (e) {
+                console.log('⚠️ Usando caché local');
+            }
+        
+            // Tu código original de guardado
             let registrosSheet = excelWorkbook.Sheets[EXCEL_CONFIG.sheets.registros];
             if (!registrosSheet) {
-                console.error('❌ Hoja de registros no encontrada');
                 return { success: false, message: 'Hoja de registros no encontrada' };
             }
-            
-            // Convertir registro a array
+        
             const registroArray = [
                 registroData.ID,
                 registroData.Tipo,
@@ -150,24 +212,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 registroData.Estado,
                 registroData.Observaciones || ''
             ];
-            
-            // Obtener datos actuales y agregar nueva fila
+        
             const currentData = XLSX.utils.sheet_to_json(registrosSheet, { header: 1 });
             currentData.push(registroArray);
-            
-            // Recrear hoja
+        
             registrosSheet = XLSX.utils.aoa_to_sheet(currentData);
             excelWorkbook.Sheets[EXCEL_CONFIG.sheets.registros] = registrosSheet;
-            
-            // Guardar archivo
+        
             XLSX.writeFile(excelWorkbook, currentExcelPath);
-            
-            console.log('✅ Registro guardado en Excel:', registroData.ID);
-            return { success: true, message: 'Registro guardado en Excel' };
-            
+        
+           console.log('✅ Registro guardado en Excel:', registroData.ID);
+           return { success: true, message: 'Registro guardado en Excel' };
+        
         } catch (error) {
-            console.error('❌ Error guardando registro en preload:', error);
-            return { success: false, message: 'Error guardando: ' + error.message };
+            console.error('❌ Error guardando registro:', error);
+            return { success: false, message: 'Error: ' + error.message };
         }
     },
 

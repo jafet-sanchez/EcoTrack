@@ -99,55 +99,6 @@ function setupMenu() {
     {
       label: 'Archivo',
       submenu: [
-        {
-          label: 'Nueva Base de Datos',
-          accelerator: 'CmdOrCtrl+N',
-          click: () => {
-            mainWindow.webContents.send('menu-nueva-bd');
-          }
-        },
-        {
-          label: 'Abrir Base de Datos',
-          accelerator: 'CmdOrCtrl+O',
-          click: async () => {
-            const result = await dialog.showOpenDialog(mainWindow, {
-              title: 'Seleccionar archivo Excel',
-              filters: [
-                { name: 'Archivos Excel', extensions: ['xlsx', 'xls'] }
-              ],
-              properties: ['openFile']
-            });
-            
-            if (!result.canceled) {
-              mainWindow.webContents.send('menu-abrir-bd', result.filePaths[0]);
-            }
-          }
-        },
-        { type: 'separator' },
-        {
-          label: 'Guardar',
-          accelerator: 'CmdOrCtrl+S',
-          click: () => {
-            mainWindow.webContents.send('menu-guardar');
-          }
-        },
-        {
-          label: 'Guardar Como...',
-          accelerator: 'CmdOrCtrl+Shift+S',
-          click: async () => {
-            const result = await dialog.showSaveDialog(mainWindow, {
-              title: 'Guardar base de datos como...',
-              defaultPath: path.join(os.homedir(), 'Documents', 'Reciclaje_Database.xlsx'),
-              filters: [
-                { name: 'Archivos Excel', extensions: ['xlsx'] }
-              ]
-            });
-            
-            if (!result.canceled) {
-              mainWindow.webContents.send('menu-guardar-como', result.filePath);
-            }
-          }
-        },
         { type: 'separator' },
         {
           label: 'Salir',

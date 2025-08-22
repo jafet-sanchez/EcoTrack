@@ -457,8 +457,14 @@ function updateDashboard() {
     // Calcular estadísticas generales 
     const registrosActivos = registrosData.filter(r => r.Estado === 'Activo');
     const registrosDespachados = registrosData.filter(r => r.Estado === 'Despachado');
-    const pesoTotal = registrosData.reduce((sum, r) => sum + r.Peso, 0);
-    
+    // Calcular peso total disponible (solo de registros activos)
+    const pesoTotal = registrosData.reduce((sum, r) => {
+       if (r.Estado === 'Activo') {
+            return sum + (r.PesoDisponible || r.Peso);
+       }
+        return sum;
+    }, 0);
+
     // Actualizar estadísticas generales (segunda fila)
     if (elements.dashRegistros) elements.dashRegistros.textContent = registrosActivos.length;
     if (elements.dashPeso) elements.dashPeso.textContent = `${pesoTotal.toFixed(1)} kg`;
@@ -1307,12 +1313,17 @@ function getSelectedGroupsInfoWithCustomWeights() {
         const proporcion = pesoSeleccionado / pesoOriginal;
         
         // Ajustar los registros con el peso proporcional
-        const registrosAjustados = registrosDelGrupo.map(registro => ({
-            ...registro,
-            PesoOriginal: registro.Peso,
-            PesoDespachado: (registro.Peso * proporcion).toFixed(2),
-            PesoRestante: (registro.Peso * (1 - proporcion)).toFixed(2)
-        }));
+        const registrosAjustados = registrosDelGrupo.map(registro => {
+            const pesoDisponibleActual = registro.PesoDisponible || registro.Peso;
+            const pesoDespachando = pesoDisponibleActual * proporcion;
+    
+            return {
+               ...registro,
+               PesoOriginal: registro.PesoOriginal || registro.Peso,
+               PesoDespachado: pesoDespachando.toFixed(2),
+               PesoRestante: (pesoDisponibleActual - pesoDespachando).toFixed(2)
+            };
+        });
         
         groupsInfo.push({
             tipo,
@@ -1615,11 +1626,14 @@ function loadReportesData() {
  */
 function getTipoIcon(tipo) {
     const icons = {
-        'Plástico': '♻️',
+        'Plega': '📑',
         'Cartón': '📦',
-        'Vidrio': '🍾',
-        'Metal': '🔧',
-        'Otros': '📄'
+        'Centro plástico (Alta)': '🏭',
+        'Plástico limpio': '🧴',
+        'Archivo': '📄',
+        'Polipropileno': '🛍️',
+        'Estopas': '🧽',
+        'PET': '🥤'
     };
     return icons[tipo] || '📄';
 }
