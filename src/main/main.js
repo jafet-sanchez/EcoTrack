@@ -147,26 +147,6 @@ function setupMenu() {
       ]
     },
     {
-      label: 'Herramientas',
-      submenu: [
-        {
-          label: 'Backup Automático',
-          type: 'checkbox',
-          checked: true,
-          click: (item) => {
-            mainWindow.webContents.send('menu-toggle-backup', item.checked);
-          }
-        },
-        { type: 'separator' },
-        {
-          label: 'Configuración',
-          click: () => {
-            mainWindow.webContents.send('menu-configuracion');
-          }
-        }
-      ]
-    },
-    {
       label: 'Ayuda',
       submenu: [
         { type: 'separator' },

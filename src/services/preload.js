@@ -1,5 +1,5 @@
 console.log('🚀 PRELOAD.JS CARGÁNDOSE...');
-const { contextBridge, ipcRendere } = require('electron');
+const { contextBridge } = require('electron');
 const path = require('path');
 const os = require('os');
 
@@ -9,7 +9,7 @@ console.log('🔧 Preload script iniciando...');
 function getAppPath() {
     const fs = require('fs');
     
-    // Ruta principal de OneDrive Coats
+    // Ruta principal de OneDrive 
     const oneDrivePath = 'C:\\Users\\COPEJArangoParra\\OneDrive - Coats\\APLICACION\\ECOTRACK';
     
     // Verificar si existe la ruta de OneDrive
@@ -131,8 +131,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     const workbook = XLSX.utils.book_new();
                     
                     // Crear hojas con headers
-                    const registrosHeaders = [['ID', 'Tipo', 'Peso', 'Fecha_Registro', 'Persona', 'Estado', 'Observaciones']];
-                    const salidasHeaders = [['ID_Salida', 'ID_Registro', 'Tipo', 'Peso', 'Fecha_Despacho', 'Persona_Autoriza', 'Observaciones']];
+                    const registrosHeaders = [[
+                        'ID', 
+                        'Tipo', 
+                        'Peso', //se quitaria este 
+                        'Fecha_Registro', 
+                        'Persona', 
+                        'Estado', 
+                        'Observaciones']];
+                    const salidasHeaders = [[
+                        'ID_Salida', 
+                        'ID_Registro', 
+                        'Tipo', 
+                        'Peso', 
+                        'Fecha_Despacho', 
+                        'Persona_Autoriza', 
+                        'Observaciones']];
                     
                     const registrosSheet = XLSX.utils.aoa_to_sheet(registrosHeaders);
                     const salidasSheet = XLSX.utils.aoa_to_sheet(salidasHeaders);
