@@ -352,107 +352,104 @@
         </div>
         
          <!-- Estadísticas por Tipo de Reciclaje -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <!-- Plega -->
-          <div class="bg-gradient-to-r from-green-500 to-green-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Plega')">
-            <div class="flex items-center justify-center mb-2">
-              <span class="text-3xl mr-2">📑</span>
+          <div class="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Plega')">
+            <div class="text-center">
+              <span class="text-4xl mb-2">📑</span>
               <div>
-                <h3 id="report-peso-plega" class="text-2xl font-bold">0 kg</h3>
-                <p class="text-green-100 text-sm font-medium">Plega</p>
+                <h3 id="report-peso-plega" class="text-2xl font-bold text-white">0 kg</h3>
+                <p class="text-green-100 text-sm font-medium mt-1">Plega</p>
               </div>
             </div>
           </div>
           
           <!-- Cartón -->
-          <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Cartón')">
-            <div class="flex items-center justify-center mb-2">
-              <span class="text-3xl mr-2">📦</span>
+          <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Cartón')">
+            <div class="text-center">
+              <span class="text-4xl mb-2">📦</span>
               <div>
-                <h3 id="report-peso-carton" class="text-2xl font-bold">0 kg</h3>
-                <p class="text-blue-100 text-sm font-medium">Cartón</p>
+                <h3 id="report-peso-carton" class="text-2xl font-bold text-white">0 kg</h3>
+                <p class="text-blue-100 text-sm font-medium mt-1">Cartón</p>
               </div>
             </div>
           </div>
           
           <!-- Centro plastico -->
-          <div class="bg-gradient-to-r from-purple-500 to-purple-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Centro plástico Alta')">
-            <div class="flex items-center justify-center mb-2">
-              <span class="text-3xl mr-2">🏭</span>
+          <div class="bg-gradient-to-br from-purple-500 to-purple-600 p-4 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Centro plástico Alta')">
+            <div class="text-center">
+              <span class="text-4xl mb-2">🏭</span>
               <div>
-                <h3 id="report-peso-centro-plastico" class="text-2xl font-bold">0 kg</h3>
-                <p class="text-purple-100 text-sm font-medium">Centro plástico Alta</p>
+                <h3 id="report-peso-centro-plastico" class="text-2xl font-bold text-white">0 kg</h3>
+                <p class="text-purple-100 text-sm font-medium mt-1">Centro plástico Alta</p>
               </div>
             </div>
           </div>
           
           <!-- Plastio limpio -->
-          <div class="bg-gradient-to-r from-orange-500 to-orange-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Plástico limpio')">
-            <div class="flex items-center justify-center mb-2">
-              <span class="text-3xl mr-2">🧴</span>
+          <div class="bg-gradient-to-br from-orange-500 to-orange-600 p-4 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Plástico limpio')">
+            <div class="text-center">
+              <span class="text-4xl mb-2">🧴</span>
               <div>
-                <h3 id="report-peso-plastico-limpio" class="text-2xl font-bold">0 kg</h3>
-                <p class="text-orange-100 text-sm font-medium">Plástico limpio</p>
+                <h3 id="report-peso-plastico-limpio" class="text-2xl font-bold text-white">0 kg</h3>
+                <p class="text-orange-100 text-sm font-medium mt-1">Plástico limpio</p>
               </div>
             </div>
           </div>
           
           <!-- Archivo -->
-          <div class="bg-gradient-to-r from-gray-500 to-gray-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Archivo')">
-            <div class="flex items-center justify-center mb-2">
-              <span class="text-3xl mr-2">📄</span>
+          <div class="bg-gradient-to-br from-gray-500 to-gray-600 p-4 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Archivo')">
+            <div class="text-center">
+              <span class="text-4xl mb-2">📄</span>
               <div>
-                <h3 id="report-peso-archivo" class="text-2xl font-bold">0 kg</h3>
-                <p class="text-gray-100 text-sm font-medium">Archivo</p>
+                <h3 id="report-peso-archivo" class="text-2xl font-bold text-white">0 kg</h3>
+                <p class="text-gray-100 text-sm font-medium mt-1">Archivo</p>
               </div>
             </div>
           </div>
-        </div>
 
         <!-- Polipropileno -->
-          <div class="bg-gradient-to-r from-gray-500 to-gray-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Polipropileno')">
-            <div class="flex items-center justify-center mb-2">
-              <span class="text-3xl mr-2">🛍️</span>
+          <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Polipropileno')">
+            <div class="text-center">
+              <span class="text-4xl mb-2">🛍️</span>
               <div>
-                <h3 id="report-peso-polipropileno" class="text-2xl font-bold">0 kg</h3>
-                <p class="text-gray-100 text-sm font-medium">Polipropileno</p>
+                <h3 id="report-peso-polipropileno" class="text-2xl font-bold text-white">0 kg</h3>
+                <p class="text-indigo-100 text-sm font-medium mt-1">Polipropileno</p>
               </div>
             </div>
           </div>
-        </div>
 
         <!-- Estopas -->
-          <div class="bg-gradient-to-r from-gray-500 to-gray-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Estopas')">
-            <div class="flex items-center justify-center mb-2">
-              <span class="text-3xl mr-2">🧽</span>
+          <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 p-4 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Estopas')">
+            <div class="text-center">
+              <span class="text-4xl mb-2">🧽</span>
               <div>
-                <h3 id="report-peso-estopas" class="text-2xl font-bold">0 kg</h3>
-                <p class="text-gray-100 text-sm font-medium">Estopas</p>
+                <h3 id="report-peso-estopas" class="text-2xl font-bold text-white">0 kg</h3>
+                <p class="text-yellow-100 text-sm font-medium mt-1">Estopas</p>
               </div>
             </div>
           </div>
-        </div>
 
         <!-- PET -->
-          <div class="bg-gradient-to-r from-gray-500 to-gray-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('PET')">
-            <div class="flex items-center justify-center mb-2">
-              <span class="text-3xl mr-2">🥤</span>
+          <div class="bg-gradient-to-br from-cyan-500 to-cyan-600 p-4 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('PET')">
+            <div class=text-center">
+              <span class="text-4xl mb-2">🥤</span>
               <div>
-                <h3 id="report-peso-pet" class="text-2xl font-bold">0 kg</h3>
-                <p class="text-gray-100 text-sm font-medium">PET</p>
+                <h3 id="report-peso-pet" class="text-2xl font-bold text-white">0 kg</h3>
+                <p class="text-cyan-100 text-sm font-medium mt-1">PET</p>
               </div>
             </div>
           </div>
-        </div>
+      </div> 
         
         <!-- Gráficos -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div class="bg-gray-800 p-6 rounded-lg">
-            <h3 class="text-lg font-semibold mb-4">Registros por Tipo</h3>
+          <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+            <h3 class="text-lg font-semibold mb-4 text-white">Registros por Tipo</h3>
             <canvas id="chart-tipos" width="400" height="200" class="w-full"></canvas>
           </div>
-          <div class="bg-gray-800 p-6 rounded-lg">
-            <h3 class="text-lg font-semibold mb-4">Estado de Registros</h3>
+          <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+            <h3 class="text-lg font-semibold mb-4 text-white">Estado de Registros</h3>
             <canvas id="chart-estados" width="400" height="200" class="w-full"></canvas>
           </div>
         </div>
