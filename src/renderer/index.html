@@ -136,7 +136,7 @@
                   <option value="">Selecciona un tipo</option>
                   <option value="Plega">📑 Plega</option>
                   <option value="Cartón">📦 Cartón</option>
-                  <option value="Centro plástico (Alta)">🏭 Centro plastico (Alta)</option>
+                  <option value="Centro plástico Alta">🏭 Centro plastico Alta</option>
                   <option value="Plástico limpio">🧴 Plástico limpio</option>
                   <option value="Archivo">📄 Archivo</option>
                   <option value="Polipropileno">🛍️ Polipropileno</option>
@@ -202,7 +202,7 @@
                 <option value="">Todos</option>
                 <option value="Plega">Plega</option>
                 <option value="Cartón">Cartón</option>
-                <option value="Centro plástico (Alta)">Centro plástico (Alta)</option>
+                <option value="Centro plástico Alta">Centro plástico Alta</option>
                 <option value="Plástico limpio">Plástico limpio</option>
                 <option value="Archivo">Archivo</option>
                 <option value="Polipropileno">Polipropileno</option>
@@ -354,11 +354,11 @@
          <!-- Estadísticas por Tipo de Reciclaje -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <!-- Plega -->
-          <div class="bg-gradient-to-r from-green-500 to-green-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Plástico')">
+          <div class="bg-gradient-to-r from-green-500 to-green-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Plega')">
             <div class="flex items-center justify-center mb-2">
               <span class="text-3xl mr-2">📑</span>
               <div>
-                <h3 id="report-peso-plastico" class="text-2xl font-bold">0 kg</h3>
+                <h3 id="report-peso-plega" class="text-2xl font-bold">0 kg</h3>
                 <p class="text-green-100 text-sm font-medium">Plega</p>
               </div>
             </div>
@@ -376,33 +376,33 @@
           </div>
           
           <!-- Centro plastico -->
-          <div class="bg-gradient-to-r from-purple-500 to-purple-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Vidrio')">
+          <div class="bg-gradient-to-r from-purple-500 to-purple-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Centro plástico Alta')">
             <div class="flex items-center justify-center mb-2">
               <span class="text-3xl mr-2">🏭</span>
               <div>
-                <h3 id="report-peso-vidrio" class="text-2xl font-bold">0 kg</h3>
-                <p class="text-purple-100 text-sm font-medium">Centro plástico (Alta)</p>
+                <h3 id="report-peso-centro-plastico" class="text-2xl font-bold">0 kg</h3>
+                <p class="text-purple-100 text-sm font-medium">Centro plástico Alta</p>
               </div>
             </div>
           </div>
           
           <!-- Plastio limpio -->
-          <div class="bg-gradient-to-r from-orange-500 to-orange-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Metal')">
+          <div class="bg-gradient-to-r from-orange-500 to-orange-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Plástico limpio')">
             <div class="flex items-center justify-center mb-2">
               <span class="text-3xl mr-2">🧴</span>
               <div>
-                <h3 id="report-peso-metal" class="text-2xl font-bold">0 kg</h3>
+                <h3 id="report-peso-plastico-limpio" class="text-2xl font-bold">0 kg</h3>
                 <p class="text-orange-100 text-sm font-medium">Plástico limpio</p>
               </div>
             </div>
           </div>
           
           <!-- Archivo -->
-          <div class="bg-gradient-to-r from-gray-500 to-gray-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Otros')">
+          <div class="bg-gradient-to-r from-gray-500 to-gray-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Archivo')">
             <div class="flex items-center justify-center mb-2">
               <span class="text-3xl mr-2">📄</span>
               <div>
-                <h3 id="report-peso-otros" class="text-2xl font-bold">0 kg</h3>
+                <h3 id="report-peso-archivo" class="text-2xl font-bold">0 kg</h3>
                 <p class="text-gray-100 text-sm font-medium">Archivo</p>
               </div>
             </div>
@@ -410,11 +410,11 @@
         </div>
 
         <!-- Polipropileno -->
-          <div class="bg-gradient-to-r from-gray-500 to-gray-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Otros')">
+          <div class="bg-gradient-to-r from-gray-500 to-gray-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Polipropileno')">
             <div class="flex items-center justify-center mb-2">
               <span class="text-3xl mr-2">🛍️</span>
               <div>
-                <h3 id="report-peso-otros" class="text-2xl font-bold">0 kg</h3>
+                <h3 id="report-peso-polipropileno" class="text-2xl font-bold">0 kg</h3>
                 <p class="text-gray-100 text-sm font-medium">Polipropileno</p>
               </div>
             </div>
@@ -422,11 +422,11 @@
         </div>
 
         <!-- Estopas -->
-          <div class="bg-gradient-to-r from-gray-500 to-gray-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Otros')">
+          <div class="bg-gradient-to-r from-gray-500 to-gray-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Estopas')">
             <div class="flex items-center justify-center mb-2">
               <span class="text-3xl mr-2">🧽</span>
               <div>
-                <h3 id="report-peso-otros" class="text-2xl font-bold">0 kg</h3>
+                <h3 id="report-peso-estopas" class="text-2xl font-bold">0 kg</h3>
                 <p class="text-gray-100 text-sm font-medium">Estopas</p>
               </div>
             </div>
@@ -434,11 +434,11 @@
         </div>
 
         <!-- PET -->
-          <div class="bg-gradient-to-r from-gray-500 to-gray-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('Otros')">
+          <div class="bg-gradient-to-r from-gray-500 to-gray-600 p-4 rounded-lg text-center text-white transform hover:scale-105 transition-all duration-200 cursor-pointer" onclick="mostrarDetallesTipoReporte('PET')">
             <div class="flex items-center justify-center mb-2">
               <span class="text-3xl mr-2">🥤</span>
               <div>
-                <h3 id="report-peso-otros" class="text-2xl font-bold">0 kg</h3>
+                <h3 id="report-peso-pet" class="text-2xl font-bold">0 kg</h3>
                 <p class="text-gray-100 text-sm font-medium">PET</p>
               </div>
             </div>

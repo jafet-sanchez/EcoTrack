@@ -1628,7 +1628,7 @@ function getTipoIcon(tipo) {
     const icons = {
         'Plega': '📑',
         'Cartón': '📦',
-        'Centro plástico (Alta)': '🏭',
+        'Centro plástico Alta': '🏭',
         'Plástico limpio': '🧴',
         'Archivo': '📄',
         'Polipropileno': '🛍️',
@@ -1964,38 +1964,50 @@ function calculateAdvancedStats() {
 function updateReportesPorTipo() {
     const pesosPorTipo = calculatePesosPorTipoReportes();
     
-    // Actualizar cada tarjeta de tipo en reportes
-    const reportPesoPlastico = document.getElementById('report-peso-plastico');
-    const reportPesoCarton = document.getElementById('report-peso-carton');
-    const reportPesoVidrio = document.getElementById('report-peso-vidrio');
-    const reportPesoMetal = document.getElementById('report-peso-metal');
-    const reportPesoOtros = document.getElementById('report-peso-otros');
+    // Mapeo de IDs a tipos
+    const mappings = {
+        'report-peso-plega': 'Plega',
+        'report-peso-carton': 'Cartón',
+        'report-peso-centro-plastico': 'Centro plástico Alta',
+        'report-peso-plastico-limpio': 'Plástico limpio',
+        'report-peso-archivo': 'Archivo',
+        'report-peso-polipropileno': 'Polipropileno',
+        'report-peso-estopas': 'Estopas',
+        'report-peso-pet': 'PET'
+    };
     
-    if (reportPesoPlastico) reportPesoPlastico.textContent = `${pesosPorTipo['Plástico'].toFixed(1)} kg`;
-    if (reportPesoCarton) reportPesoCarton.textContent = `${pesosPorTipo['Cartón'].toFixed(1)} kg`;
-    if (reportPesoVidrio) reportPesoVidrio.textContent = `${pesosPorTipo['Vidrio'].toFixed(1)} kg`;
-    if (reportPesoMetal) reportPesoMetal.textContent = `${pesosPorTipo['Metal'].toFixed(1)} kg`;
-    if (reportPesoOtros) reportPesoOtros.textContent = `${pesosPorTipo['Otros'].toFixed(1)} kg`;
+    // Actualizar cada elemento
+    Object.entries(mappings).forEach(([elementId, tipo]) => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            const peso = pesosPorTipo[tipo] || 0;
+            element.textContent = `${peso.toFixed(1)} kg`;
+        }
+    });
     
-    console.log('📊 Tarjetas de reportes por tipo actualizadas');
+    console.log('📊 Tarjetas de reportes por tipo actualizadas:', pesosPorTipo);
 }
-
 /**
  * Calcular peso total por tipo para reportes (NUEVA FUNCIÓN)
  */
 function calculatePesosPorTipoReportes() {
     const pesosPorTipo = {
-        'Plástico': 0,
+        'Plega': 0,
         'Cartón': 0,
-        'Vidrio': 0,
-        'Metal': 0,
-        'Otros': 0
+        'Centro plástico Alta': 0,
+        'Plástico limpio': 0,
+        'Archivo': 0,
+        'Polipropileno': 0,
+        'Estopas': 0,
+        'PET': 0
     };
     
-    // Sumar pesos de todos los registros (activos y despachados)
+    // Sumar pesos solo de registros activos
     registrosData.forEach(registro => {
-        if (pesosPorTipo.hasOwnProperty(registro.Tipo)) {
-            pesosPorTipo[registro.Tipo] += registro.Peso;
+        if (registro.Estado === 'Activo' && pesosPorTipo.hasOwnProperty(registro.Tipo)) {
+            // Usar PesoDisponible si existe, sino usar Peso
+            const pesoAUsar = registro.PesoDisponible !== undefined ? registro.PesoDisponible : registro.Peso;
+            pesosPorTipo[registro.Tipo] += pesoAUsar;
         }
     });
     
