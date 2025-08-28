@@ -134,19 +134,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     const registrosHeaders = [[
                         'ID', 
                         'Tipo', 
-                        'Peso', //se quitaria este 
+                        'Peso_Inicial',     // Nuevo
+                        'Peso_Restante',    // Nuevo
                         'Fecha_Registro', 
                         'Persona', 
                         'Estado', 
-                        'Observaciones']];
+                        'Observaciones'
+                    ]];
                     const salidasHeaders = [[
                         'ID_Salida', 
                         'ID_Registro', 
                         'Tipo', 
-                        'Peso', 
+                        'Peso_Despachado',  // Más claro
                         'Fecha_Despacho', 
                         'Persona_Autoriza', 
-                        'Observaciones']];
+                        'Observaciones'
+                    ]];
                     
                     const registrosSheet = XLSX.utils.aoa_to_sheet(registrosHeaders);
                     const salidasSheet = XLSX.utils.aoa_to_sheet(salidasHeaders);
@@ -220,7 +223,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             const registroArray = [
                 registroData.ID,
                 registroData.Tipo,
-                registroData.Peso,
+                registroData.Peso_Inicial,
+                registroData.Peso_Restante,
                 registroData.Fecha_Registro,
                 registroData.Persona,
                 registroData.Estado,
@@ -329,9 +333,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     
-    async procesarSalidaConParciales(datos) {
+    async procesarSalidaFIFO(datos) {
       try {
-        console.log('📤 Procesando salida con parciales:', datos);
+        console.log('🚀 Procesando salida FIFO:', datos);
         
         if (!isExcelLoaded || !excelWorkbook) {
             return { success: false, message: 'Excel no está cargado' };
@@ -342,90 +346,114 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return { success: false, message: 'XLSX no disponible' };
         }
         
-        const { salida, registrosModificados, registrosParcialesInfo } = datos;
+        const { tipoMaterial, pesoSolicitado, fechaSalida, personaAutoriza, observaciones } = datos;
         
-        // IMPORTANTE: NO MODIFICAR LA HOJA DE REGISTROS
-        // Solo actualizar el ESTADO, NO el peso
+        // Leer registros actuales
         let registrosSheet = excelWorkbook.Sheets[EXCEL_CONFIG.sheets.registros];
         const registrosArray = XLSX.utils.sheet_to_json(registrosSheet, { header: 1 });
         
-        // Solo actualizar ESTADOS, no pesos
-        registrosModificados.forEach(mod => {
-            for (let i = 1; i < registrosArray.length; i++) {
-                if (registrosArray[i][0] === mod.id) {
-                    // NO MODIFICAR EL PESO 
-                    // Solo actualizar el ESTADO 
-                    if (mod.mantenerActivo) {
-                        registrosArray[i][5] = 'Activo'; // Mantener como Activo
-                    } else {
-                        registrosArray[i][5] = 'Despachado'; // Marcar como Despachado
-                    }
-                    break;
-                }
+        // Filtrar y ordenar registros del tipo solicitado (FIFO - por ID)
+        const registrosDelTipo = [];
+        for (let i = 1; i < registrosArray.length; i++) {
+            if (registrosArray[i][1] === tipoMaterial && registrosArray[i][6] === 'Activo') {
+                registrosDelTipo.push({
+                    index: i,
+                    id: registrosArray[i][0],
+                    tipo: registrosArray[i][1],
+                    pesoInicial: parseFloat(registrosArray[i][2]),
+                    pesoRestante: parseFloat(registrosArray[i][3]),
+                    persona: registrosArray[i][5]
+                });
             }
-        });
+        }
         
-        // Recrear hoja de registros
+        // Ordenar por ID (FIFO)
+        registrosDelTipo.sort((a, b) => a.id - b.id);
+        
+        // Procesar despacho FIFO
+        let pesoFaltante = parseFloat(pesoSolicitado);
+        const detallesSalida = [];
+        const TOLERANCIA = 0.01;
+        
+        for (const registro of registrosDelTipo) {
+            if (pesoFaltante <= TOLERANCIA) break;
+            
+            const pesoADespachar = Math.min(registro.pesoRestante, pesoFaltante);
+            const nuevoPesoRestante = parseFloat((registro.pesoRestante - pesoADespachar).toFixed(2));
+            
+            // Actualizar registro en el array
+            registrosArray[registro.index][3] = nuevoPesoRestante; // Peso_Restante
+            
+            // Si queda menos de la tolerancia, marcar como despachado
+            if (nuevoPesoRestante < TOLERANCIA) {
+                registrosArray[registro.index][3] = 0;
+                registrosArray[registro.index][6] = 'Despachado'; // Estado
+            }
+            
+            // Guardar detalle para salidas
+            detallesSalida.push({
+                idRegistro: registro.id,
+                tipo: registro.tipo,
+                pesoDespachado: parseFloat(pesoADespachar.toFixed(2)),
+                personaOriginal: registro.persona
+            });
+            
+            pesoFaltante = parseFloat((pesoFaltante - pesoADespachar).toFixed(2));
+        }
+        
+        // Verificar si se pudo despachar todo
+        if (pesoFaltante > TOLERANCIA) {
+            return { 
+                success: false, 
+                message: `Solo hay ${(pesoSolicitado - pesoFaltante).toFixed(2)}kg disponibles de ${tipoMaterial}` 
+            };
+        }
+        
+        // Actualizar hoja de registros
         registrosSheet = XLSX.utils.aoa_to_sheet(registrosArray);
         excelWorkbook.Sheets[EXCEL_CONFIG.sheets.registros] = registrosSheet;
         
-        // AGREGAR SALIDA - SIEMPRE
+        // Agregar salidas
         let salidasSheet = excelWorkbook.Sheets[EXCEL_CONFIG.sheets.salidas];
         const currentSalidasData = XLSX.utils.sheet_to_json(salidasSheet, { header: 1 });
         
-        // Si hay info de parciales, usar esa
-        if (registrosParcialesInfo && registrosParcialesInfo.length > 0) {
-            registrosParcialesInfo.forEach(info => {
-                // Buscar el tipo del registro
-                const registro = registrosArray.find(r => r[0] === info.id);
-                const tipo = registro ? registro[1] : 'Desconocido';
-                
-                const salidaArray = [
-                    salida.ID_Salida,
-                    info.id,
-                    tipo,
-                    info.pesoDespachado, // Peso despachado, no el original
-                    salida.Fecha_Despacho,
-                    salida.Persona_Autoriza,
-                    salida.Observaciones || ''
-                ];
-                currentSalidasData.push(salidaArray);
-            });
-        } else {
-            // Para despachos completos normales
-            salida.Detalle_Grupos.forEach(grupo => {
-                grupo.ids.forEach(id => {
-                    const registro = registrosArray.find(r => r[0] === id);
-                    if (registro) {
-                        const salidaArray = [
-                            salida.ID_Salida,
-                            id,
-                            registro[1], // Tipo
-                            grupo.peso / grupo.ids.length, // Peso promedio
-                            salida.Fecha_Despacho,
-                            salida.Persona_Autoriza,
-                            salida.Observaciones || ''
-                        ];
-                        currentSalidasData.push(salidaArray);
-                    }
-                });
-            });
-        }
+        // Obtener siguiente ID de salida
+        const nextSalidaId = currentSalidasData.length > 1 
+            ? Math.max(...currentSalidasData.slice(1).map(row => row[0])) + 1 
+            : 1;
         
-        // Recrear hoja de salidas
+        // Agregar cada detalle de salida
+        detallesSalida.forEach(detalle => {
+            const salidaArray = [
+                nextSalidaId,
+                detalle.idRegistro,
+                detalle.tipo,
+                detalle.pesoDespachado,
+                fechaSalida,
+                personaAutoriza,
+                observaciones || ''
+            ];
+            currentSalidasData.push(salidaArray);
+        });
+        
+        // Actualizar hoja de salidas
         salidasSheet = XLSX.utils.aoa_to_sheet(currentSalidasData);
         excelWorkbook.Sheets[EXCEL_CONFIG.sheets.salidas] = salidasSheet;
         
         // Guardar archivo
         XLSX.writeFile(excelWorkbook, currentExcelPath);
         
-        console.log('✅ Salida con parciales procesada en Excel');
-        return { success: true, message: 'Salida procesada correctamente' };
+        console.log('✅ Salida procesada en Excel');
+        return { 
+            success: true, 
+            message: 'Salida procesada correctamente',
+            detalles: detallesSalida
+        };
         
-      } catch (error) {
-        console.error('❌ Error procesando salida con parciales:', error);
-        return { success: false, message: error.message };
-      }
+        } catch (error) {
+           console.error('❌ Error procesando salida FIFO:', error);
+            return { success: false, message: error.message };
+        }
     },
 
     async loadDataFromExcel() {
@@ -466,7 +494,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 if (!pesosDespachados[idRegistro]) {
                     pesosDespachados[idRegistro] = 0;
                 }
-                pesosDespachados[idRegistro] += parseFloat(salida.Peso) || 0;
+                pesosDespachados[idRegistro] += parseFloat(salida.Peso_Despachado || salida.Peso) || 0;
             });
             
             // IMPORTANTE: NO modificar el campo Peso, solo agregar metadata
@@ -533,7 +561,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 }
                 
                 grupo.cantidad++;
-                grupo.peso += parseFloat(row.Peso) || 0;
+                grupo.peso += parseFloat(row.Peso_Despachado || row.Peso) || 0;
 
                 if (!grupo.ids.includes(row.ID_Registro)) {
                     grupo.ids.push(row.ID_Registro);

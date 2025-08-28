@@ -349,11 +349,13 @@ async function setupFormReciclaje(){
             return;
         }
 
-        // Crear nuevo registro
+        // Crear nuevo registro con Peso_Inicial y Peso_Restante
+        const pesoNumerico = parseFloat(peso);
         const nuevoRegistro = {
             ID: getNextRegistroId(),
             Tipo: tipo,
-            Peso: parseFloat(peso),
+            Peso_Inicial: pesoNumerico,
+            Peso_Restante: pesoNumerico,
             Fecha_Registro: fecha + 'T' + new Date().toTimeString().slice(0,5),
             Persona: persona,
             Estado: 'Activo',
@@ -460,7 +462,7 @@ function updateDashboard() {
     // Calcular peso total disponible (solo de registros activos)
     const pesoTotal = registrosData.reduce((sum, r) => {
        if (r.Estado === 'Activo') {
-            return sum + (r.PesoDisponible || r.Peso);
+            return sum + (r.Peso_Restante || r.Peso_Inicial || 0);
        }
         return sum;
     }, 0);
@@ -510,7 +512,7 @@ function createHistorialRow(registro) {
     row.innerHTML = `
         <td class="py-3 px-2"><strong>#${registro.ID}</strong></td>
         <td class="py-3 px-2">${tipoIcon} ${registro.Tipo}</td>
-        <td class="py-3 px-2"><strong>${registro.Peso}kg</strong></td>
+        <td class="py-3 px-2"><strong>${(registro.Peso_Inicial || registro.Peso || 0).toFixed(2)}kg</strong></td>
         <td class="py-3 px-2">${formatDateTime(registro.Fecha_Registro)}</td>
         <td class="py-3 px-2">${registro.Persona}</td>
         <td class="py-3 px-2"><span class="${estadoBadgeClass}">${registro.Estado}</span></td>
@@ -534,403 +536,127 @@ function createHistorialRow(registro) {
 /**
  * Cargar registros disponibles agrupados por tipo para salida (FUNCIÓN PRINCIPAL)
  */
-function loadRegistrosDisponiblesAgrupados() {
-    const container = document.getElementById('registros-disponibles');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    // CALCULAR PESO DISPONIBLE CORRECTAMENTE
-    const registrosConPesoDisponible = registrosData.map(registro => {
-        if (registro.Estado === 'Despachado') {
-            return { ...registro, PesoDisponible: 0 };
-        }
-        
-        // Calcular cuánto se ha despachado de este registro
-        let pesoDespachado = 0;
-        
-        // Buscar en todas las salidas
-        salidasData.forEach(salida => {
-            // Buscar en RegistrosParciales (información más precisa)
-            if (salida.RegistrosParciales && salida.RegistrosParciales.length > 0) {
-                const parcial = salida.RegistrosParciales.find(p => p.id === registro.ID);
-                if (parcial) {
-                    pesoDespachado += parseFloat(parcial.pesoDespachado) || 0;
-                }
-            }
-            // Si no hay RegistrosParciales, buscar en Detalle_Grupos
-            else if (salida.Detalle_Grupos) {
-                salida.Detalle_Grupos.forEach(grupo => {
-                    if (grupo.ids && grupo.ids.includes(registro.ID)) {
-                        // Calcular peso despachado por este registro
-                        const pesoGrupoPorRegistro = grupo.peso / grupo.ids.length;
-                        pesoDespachado += pesoGrupoPorRegistro;
-                    }
-                });
-            }
-        });
-        
-        // IMPORTANTE: Usar el peso original del registro, NO el peso ya modificado
-        const pesoOriginal = registro.PesoOriginal || registro.Peso;
-        const pesoDisponible = Math.max(0, pesoOriginal - pesoDespachado);
-        
-        return { 
-            ...registro, 
-            PesoOriginal: pesoOriginal,
-            PesoDisponible: pesoDisponible,
-            PesoDespachado: pesoDespachado
-        };
-    });
-    
-    // Filtrar solo los que tienen peso disponible y están activos
-    const registrosActivos = registrosConPesoDisponible.filter(r => 
-        r.Estado === 'Activo' && r.PesoDisponible > 0
+async function loadRegistrosDisponiblesAgrupados() {
+    const contenedor = document.getElementById('registros-disponibles');
+    if (!contenedor) return;
+
+    // Filtrar registros activos con peso restante > 0
+    const registrosActivos = registrosData.filter(r => 
+        r.Estado === 'Activo' && 
+        (r.Peso_Restante || r.Peso) > 0.01
     );
-    
-    // Agrupar usando peso disponible
+
+    // Agrupar por tipo
     const grupos = {};
     registrosActivos.forEach(registro => {
-        if (!grupos[registro.Tipo]) {
-            grupos[registro.Tipo] = {
+        const tipo = registro.Tipo;
+        if (!grupos[tipo]) {
+            grupos[tipo] = {
+                tipo: tipo,
                 registros: [],
-                personas: [],
                 pesoTotal: 0,
-                pesoOriginalTotal: 0,
-                cantidad: 0,
-                ids: []
+                personas: []
             };
         }
         
-        grupos[registro.Tipo].registros.push(registro);
-        grupos[registro.Tipo].ids.push(registro.ID);
-        grupos[registro.Tipo].pesoTotal += registro.PesoDisponible; // Usar peso disponible
-        grupos[registro.Tipo].pesoOriginalTotal += registro.PesoOriginal;
-        grupos[registro.Tipo].cantidad++;
+        const pesoDisponible = registro.Peso_Restante || registro.Peso;
         
-        if (!grupos[registro.Tipo].personas.includes(registro.Persona)) {
-            grupos[registro.Tipo].personas.push(registro.Persona);
+        grupos[tipo].registros.push({
+            ...registro,
+            pesoDisponible: pesoDisponible
+        });
+        grupos[tipo].pesoTotal += pesoDisponible;
+        
+        // Agregar persona si no está ya en la lista
+        if (!grupos[tipo].personas.includes(registro.Persona)) {
+            grupos[tipo].personas.push(registro.Persona);
         }
     });
-    
-    // Mostrar registros despachados
-    const registrosDespachados = registrosConPesoDisponible.filter(r => r.Estado === 'Despachado');
-    
-    if (Object.keys(grupos).length === 0 && registrosDespachados.length === 0) {
-        container.innerHTML = '<p class="text-gray-400 text-center py-4">No hay registros disponibles</p>';
-        return;
-    }
-    
-    // Mostrar grupos de registros activos con peso disponible
-    Object.entries(grupos).forEach(([tipo, grupo]) => {
-        const grupoElement = createGrupoDisponibleItem(tipo, grupo);
-        container.appendChild(grupoElement);
+
+    // Ordenar registros dentro de cada grupo por ID 
+    Object.values(grupos).forEach(grupo => {
+        grupo.registros.sort((a, b) => a.ID - b.ID);
     });
-    
-    // Mostrar registros despachados
-    if (registrosDespachados.length > 0) {
-        const separador = document.createElement('div');
-        separador.className = 'border-t border-gray-500 my-3 pt-3';
-        separador.innerHTML = '<h4 class="text-sm text-gray-400 font-semibold mb-2">📦 Registros Despachados</h4>';
-        container.appendChild(separador);
-        
-        registrosDespachados.forEach(registro => {
-            const item = createRegistroDespachado(registro);
-            container.appendChild(item);
-        });
-    }
-    
-    console.log('📊 Registros con peso disponible:', registrosConPesoDisponible);
-    console.log('📦 Grupos formados:', grupos);
-}
 
-/**
- * Cargar registros disponibles agrupados por tipo para salida (FUNCIÓN PRINCIPAL)
- */
-async function procesarSalidaGrupalConPesosPersonalizados(registrosSeleccionados, gruposSeleccionados) {
-    showLoading('Procesando salida con pesos personalizados...');
-
-    try {
-        const salidaData = {
-            registrosIds: registrosSeleccionados,
-            grupos: gruposSeleccionados,
-            fechaSalida: document.getElementById('fecha-salida').value,
-            personaAutoriza: document.getElementById('persona-autoriza').value,
-            observaciones: document.getElementById('observaciones-salida').value
-        };
-
-        console.log('📤 Procesando salida con pesos personalizados:', salidaData);
-
-        const registrosModificados = [];
-        const registrosParcialesInfo = [];
-
-        // Procesar cada grupo
-        gruposSeleccionados.forEach(grupo => {
-            grupo.registros.forEach(registro => {
-                // IMPORTANTE: Calcular pesos correctamente
-                const pesoOriginal = registro.PesoOriginal || registro.Peso;
-                const disponibleAntes = registro.PesoDisponible ?? pesoOriginal;
-
-                let pesoDespachado;
-                if (grupo.proporcionDespachada && grupo.proporcionDespachada < 1) {
-                    pesoDespachado = disponibleAntes * grupo.proporcionDespachada;
-                } else {
-                    pesoDespachado = Math.min(disponibleAntes, grupo.peso / grupo.registros.length);
-                }
-                
-                const pesoRestante = disponibleAntes - pesoDespachado;
-                
-                
-                
-                registrosParcialesInfo.push({
-                    id: registro.ID,
-                    pesoOriginal: pesoOriginal,
-                    pesoDespachado: pesoDespachado,
-                    pesoRestante: pesoRestante
-                });
-                
-                // Actualizar estado del registro
-                const reg = registrosData.find(r => r.ID === registro.ID);
-                if (reg) {
-                    if (pesoRestante > 0) {
-                        reg.Estado = 'Activo';
-                        // MANTENER el peso original, no modificarlo
-                        reg.PesoOriginal = pesoOriginal;
-                        registrosModificados.push({
-                            id: reg.ID,
-                            mantenerActivo: true,
-                            pesoRestante: pesoRestante
-                        });
-                    } else {
-                        reg.Estado = 'Despachado';
-                        registrosModificados.push({
-                            id: reg.ID,
-                            mantenerActivo: false,
-                            pesoRestante: 0
-                        });
-                    }
-                }
-            });
-        });
-
-        // Crear registro de salida
-        const nuevaSalida = {
-            ID_Salida: getNextSalidaId(),
-            Fecha_Despacho: salidaData.fechaSalida,
-            Persona_Autoriza: salidaData.personaAutoriza,
-            Registros_Procesados: registrosSeleccionados.length,
-            Grupos_Procesados: gruposSeleccionados.length,
-            Tipos_Despachados: gruposSeleccionados.map(g => g.tipo).join(', '),
-            Peso_Total_Despachado: gruposSeleccionados.reduce((sum, g) => sum + g.peso, 0),
-            Observaciones: salidaData.observaciones,
-            Detalle_Grupos: gruposSeleccionados.map(grupo => ({
-                tipo: grupo.tipo,
-                cantidad: grupo.cantidad,
-                peso: grupo.peso,
-                pesoOriginal: grupo.pesoOriginal,
-                ids: grupo.ids,
-                personas: grupo.personas || [],
-                proporcionDespachada: grupo.proporcionDespachada
-            })),
-            RegistrosParciales: registrosParcialesInfo
-        };
-
-        console.log('Nueva salida creada:', nuevaSalida);
-        console.log('Registros parciales:', registrosParcialesInfo);
-
-        // Enviar a Excel
-        if (window.electronAPI) {
-            const result = await window.electronAPI.procesarSalidaConParciales({
-                salida: nuevaSalida,
-                registrosModificados: registrosModificados,
-                registrosParcialesInfo: registrosParcialesInfo
-            });
-
-            if (result.success) {
-                console.log('✅ Salida procesada en Excel con parciales');
-            }
-
-            // Recargar datos desde Excel
-            const loadResult = await window.electronAPI.loadDataFromExcel();
-            if (loadResult.success && loadResult.data) {
-                registrosData.length = 0;
-                registrosData.push(...(loadResult.data.registros || []));
-                
-                salidasData.length = 0;
-                salidasData.push(...(loadResult.data.salidas || []));
-                
-                // Asegurar que RegistrosParciales se preserve
-                salidasData.forEach(salida => {
-                    if (!salida.RegistrosParciales && salida.Detalle_Grupos) {
-                        salida.RegistrosParciales = [];
-                        salida.Detalle_Grupos.forEach(grupo => {
-                            const pesoPorRegistro = grupo.peso / grupo.ids.length;
-                            grupo.ids.forEach(id => {
-                                salida.RegistrosParciales.push({
-                                    id: id,
-                                    pesoDespachado: pesoPorRegistro
-                                });
-                            });
-                        });
-                    }
-                });
-            }
-        } else {
-            // Sin Excel, actualizar solo memoria
-            salidasData.push(nuevaSalida);
-        }
-
-        hideLoading();
-
-        const pesoTotal = gruposSeleccionados.reduce((sum, g) => sum + g.peso, 0);
-        let successMessage = `Salida #${nuevaSalida.ID_Salida} procesada:\n`;
-        successMessage += `• ${pesoTotal.toFixed(1)}kg despachados`;
-        
-        const registrosConRestante = registrosModificados.filter(r => r.mantenerActivo);
-        if (registrosConRestante.length > 0) {
-            successMessage += `\n• ${registrosConRestante.length} registro(s) con peso restante activo`;
-        }
-
-        showToast('Éxito', successMessage, 'success');
-
-        updateDashboard();
-        loadSalidasData();
-        
-        if (currentSection === 'historial') {
-            loadHistorialData();
-        }
-
-        document.getElementById('form-salida').reset();
-        setupDateTimeInputs();
-        
-    } catch (error) {
-        hideLoading();
-        console.error('❌ Error al procesar salida:', error);
-        showToast('Error', 'Ocurrió un error al procesar la salida', 'error');
-    }
-}
-
-/**
- * Crear elemento de grupo disponible para selección CON INPUT DE PESO
- */
-function createGrupoDisponibleItem(tipo, grupo) {
-    const div = document.createElement('div');
-    div.className = 'border-2 border-gray-600 rounded-lg p-4 mb-3 hover:bg-gray-700 hover:border-blue-500 transition-all duration-200';
-    
-    const tipoIcon = getTipoIcon(tipo);
-    const personasTexto = grupo.personas.join(', ');
-    const idsTexto = grupo.ids.map(id => `#${id}`).join(', ');
-    const grupoId = `grupo-${tipo.toLowerCase().replace(/\s+/g, '-')}`;
-    
-    div.innerHTML = `
-        <div class="flex items-start space-x-4">
-            <input type="checkbox" 
-                   value="${grupo.ids.join(',')}" 
-                   id="${grupoId}" 
-                   class="mt-1 w-5 h-5 rounded border-2 border-gray-500 text-blue-600 focus:ring-blue-500 focus:ring-2" 
-                   data-tipo="${tipo}"
-                   data-cantidad="${grupo.cantidad}"
-                   data-peso="${grupo.pesoTotal}"
-                   onchange="handleGrupoSelection('${grupoId}', ${grupo.pesoTotal})">
+    // Renderizar grupos con el diseño oscuro elegante
+    let html = '';
+    if (Object.keys(grupos).length === 0) {
+        html = '<p class="text-gray-500">No hay registros disponibles para despacho</p>';
+    } else {
+        Object.values(grupos).forEach(grupo => {
+            const grupoId = `grupo-${grupo.tipo.replace(/\s+/g, '-')}`;
+            const tipoIcon = getTipoIcon(grupo.tipo);
+            const personasTexto = grupo.personas.join(', ');
+            const idsTexto = grupo.registros.map(r => `#${r.ID}`).join(', ');
             
-            <label for="${grupoId}" class="flex-1 cursor-pointer">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center">
-                        <span class="text-2xl mr-3">${tipoIcon}</span>
-                        <div>
-                            <h4 class="text-lg font-bold text-white">${tipo}</h4>
-                            <div class="flex items-center space-x-3 mt-1">
-                                <span class="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                                    ${grupo.cantidad} ${grupo.cantidad === 1 ? 'registro' : 'registros'}
-                                </span>
-                                <span class="text-yellow-400 font-bold text-lg">
-                                    <span id="peso-disponible-${grupoId}">${grupo.pesoTotal.toFixed(1)}</span>kg disponibles
-                                </span>
+            html += `
+                <div class="border-2 border-gray-600 rounded-lg p-4 mb-3 bg-gray-800 hover:bg-gray-700 hover:border-blue-500 transition-all duration-200">
+                    <div class="flex items-start space-x-4">
+                        <input type="checkbox" 
+                               id="${grupoId}" 
+                               data-tipo="${grupo.tipo}"
+                               data-peso="${grupo.pesoTotal.toFixed(2)}"
+                               onchange="handleGrupoCheckbox('${grupoId}')"
+                               class="mt-1 w-5 h-5 rounded border-2 border-gray-500 text-blue-600 focus:ring-blue-500 focus:ring-2">
+                        
+                        <label for="${grupoId}" class="flex-1 cursor-pointer">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center">
+                                    <span class="text-2xl mr-3">${tipoIcon}</span>
+                                    <div>
+                                        <h4 class="text-lg font-bold text-white">${grupo.tipo}</h4>
+                                        <div class="flex items-center space-x-3 mt-1">
+                                            <span class="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                                                ${grupo.registros.length} ${grupo.registros.length === 1 ? 'registro' : 'registros'}
+                                            </span>
+                                            <span class="text-yellow-400 font-bold">
+                                                ${grupo.pesoTotal.toFixed(1)}kg disponibles
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                            
+                            <div id="${grupoId}-peso-input" class="hidden mt-3 p-3 bg-gray-900 rounded-lg border border-blue-500">
+                                <div class="flex items-center space-x-3">
+                                    <label class="text-sm text-gray-300">Peso a despachar:</label>
+                                    <input type="number" 
+                                           id="peso-input-${grupoId}"
+                                           step="0.01"
+                                           min="0.01"
+                                           max="${grupo.pesoTotal.toFixed(2)}"
+                                           class="w-24 px-2 py-1 bg-gray-700 text-white border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                                           placeholder="0.0"
+                                           onblur="validarPesoInput('${grupoId}', ${grupo.pesoTotal})">
+                                    <span class="text-sm text-gray-300">kg</span>
+                                    <span id="peso-error-${grupoId}" class="text-red-500 text-sm hidden"></span>
+                                    <span id="peso-success-${grupoId}" class="text-green-500 text-sm hidden">✓ Válido</span>
+                                </div>
+                                <div class="mt-2 text-xs text-gray-400">
+                                    Máximo disponible: ${grupo.pesoTotal.toFixed(1)}kg
+                                </div>
+                            </div>
+                            
+                            <div class="text-sm text-gray-300 space-y-2 bg-gray-900 p-3 rounded-lg mt-3">
+                                <div class="flex items-center">
+                                    <i class="fas fa-users mr-2 text-blue-400"></i>
+                                    <strong class="text-white mr-2">Personas:</strong> 
+                                    <span>${personasTexto}</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <i class="fas fa-hashtag mr-2 text-green-400"></i>
+                                    <strong class="text-white mr-2">IDs:</strong> 
+                                    <span>${idsTexto}</span>
+                                </div>
+                            </div>
+                        </label>
                     </div>
                 </div>
-                
-                <!-- INPUT DE PESO PERSONALIZADO -->
-                <div id="peso-input-container-${grupoId}" class="hidden mt-3 p-3 bg-gray-800 rounded-lg border border-blue-500">
-                    <div class="flex items-center space-x-3">
-                        <label class="text-sm text-gray-300">Peso a despachar:</label>
-                        <input type="text" 
-                               id="peso-input-${grupoId}"
-                               class="w-24 px-2 py-1 bg-gray-700 text-white border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
-                               placeholder="0.0"
-                               onkeyup="validarPesoInput('${grupoId}', ${grupo.pesoTotal})"
-                               onblur="confirmarPesoInput('${grupoId}', ${grupo.pesoTotal})">
-                        <span class="text-sm text-gray-300">kg</span>
-                        <span id="peso-error-${grupoId}" class="text-red-500 text-sm ml-2 hidden"></span>
-                        <span id="peso-success-${grupoId}" class="text-green-500 text-sm ml-2 hidden">✓ Válido</span>
-                    </div>
-                    <div class="mt-2 text-xs text-gray-400">
-                        Máximo disponible: ${grupo.pesoTotal.toFixed(1)}kg
-                    </div>
-                </div>
-                
-                <div class="text-sm text-gray-300 space-y-2 bg-gray-800 p-3 rounded-lg mt-3">
-                    <div class="flex items-center">
-                        <i class="fas fa-users mr-2 text-blue-400"></i>
-                        <strong class="text-white mr-2">Personas:</strong> 
-                        <span>${personasTexto}</span>
-                    </div>
-                    <div class="flex items-center">
-                        <i class="fas fa-hashtag mr-2 text-green-400"></i>
-                        <strong class="text-white mr-2">IDs:</strong> 
-                        <span>${idsTexto}</span>
-                    </div>
-                </div>
-            </label>
-        </div>
-    `;
-    
-    return div;
-}
+            `;
+        });
+    }
 
-/**
- * Crear elemento de registro despachado 
- */
-function createRegistroDespachado(registro) {
-    const div = document.createElement('div');
-    div.className = 'flex items-center p-3 bg-gray-700 rounded border-l-4 border-gray-500 opacity-75 mb-2';
-    
-    const tipoIcon = getTipoIcon(registro.Tipo);
-    
-    div.innerHTML = `
-        <span class="text-xl mr-3">${tipoIcon}</span>
-        <div class="flex-1">
-            <div class="flex items-center justify-between">
-                <div>
-                    <span class="text-gray-300 font-semibold">#${registro.ID} - ${registro.Tipo}</span>
-                    <span class="text-gray-400 ml-3">${registro.Peso}kg</span>
-                </div>
-                <div class="text-right">
-                    <div class="text-gray-400 text-sm">${registro.Persona}</div>
-                    <span class="text-xs bg-gray-600 text-gray-300 px-2 py-1 rounded">Ya Despachado</span>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    return div;
-}
-
-
-
-/**
- * Obtener registros seleccionados para salida (ACTUALIZADO PARA GRUPOS)
- */
-function getSelectedRegistros() {
-    const checkboxes = document.querySelectorAll('#registros-disponibles input[type="checkbox"]:checked');
-    const selectedIds = [];
-    
-    checkboxes.forEach(checkbox => {
-        const ids = checkbox.value.split(',').map(id => parseInt(id.trim()));
-        selectedIds.push(...ids);
-    });
-    
-    return selectedIds;
+    contenedor.innerHTML = html;
 }
 
 /**
@@ -1161,6 +887,31 @@ function cerrarModalDetalle() {
     }
 }
 
+/**
+ * Manejar checkbox de grupo para mostrar/ocultar input de peso
+ */
+function handleGrupoCheckbox(grupoId) {
+    const checkbox = document.getElementById(grupoId);
+    const inputContainer = document.getElementById(`${grupoId}-peso-input`);
+    
+    if (checkbox && checkbox.checked) {
+        // Mostrar input de peso
+        if (inputContainer) {
+            inputContainer.classList.remove('hidden');
+            const pesoInput = document.getElementById(`peso-input-${grupoId}`);
+            if (pesoInput) {
+                pesoInput.value = checkbox.dataset.peso; // Valor por defecto: todo el peso
+                pesoInput.focus();
+            }
+        }
+    } else {
+        // Ocultar input
+        if (inputContainer) {
+            inputContainer.classList.add('hidden');
+        }
+    }
+}
+
 
 /**
  * Manejar selección de grupo y mostrar/ocultar input de peso
@@ -1290,50 +1041,22 @@ function getSelectedGroupsInfoWithCustomWeights() {
     checkboxes.forEach(checkbox => {
         const grupoId = checkbox.id;
         const tipo = checkbox.dataset.tipo;
-        const cantidad = parseInt(checkbox.dataset.cantidad);
-        const pesoOriginal = parseFloat(checkbox.dataset.peso);
-        const ids = checkbox.value.split(',').map(id => parseInt(id.trim()));
+        const pesoMaximo = parseFloat(checkbox.dataset.peso);
         
         // Obtener el peso personalizado del input
         const pesoInput = document.getElementById(`peso-input-${grupoId}`);
-        let pesoSeleccionado = pesoOriginal; // Por defecto, todo el peso
+        let pesoSeleccionado = pesoMaximo;
         
         if (pesoInput && pesoInput.value) {
             const pesoCustom = parseFloat(pesoInput.value);
-            if (!isNaN(pesoCustom) && pesoCustom > 0 && pesoCustom <= pesoOriginal) {
+            if (!isNaN(pesoCustom) && pesoCustom > 0 && pesoCustom <= pesoMaximo) {
                 pesoSeleccionado = pesoCustom;
             }
         }
         
-        // Obtener las personas de este grupo
-        const registrosDelGrupo = registrosData.filter(r => ids.includes(r.ID));
-        const personas = [...new Set(registrosDelGrupo.map(r => r.Persona))];
-        
-        // Calcular la proporción de peso para cada registro
-        const proporcion = pesoSeleccionado / pesoOriginal;
-        
-        // Ajustar los registros con el peso proporcional
-        const registrosAjustados = registrosDelGrupo.map(registro => {
-            const pesoDisponibleActual = registro.PesoDisponible || registro.Peso;
-            const pesoDespachando = pesoDisponibleActual * proporcion;
-    
-            return {
-               ...registro,
-               PesoOriginal: registro.PesoOriginal || registro.Peso,
-               PesoDespachado: pesoDespachando.toFixed(2),
-               PesoRestante: (pesoDisponibleActual - pesoDespachando).toFixed(2)
-            };
-        });
-        
         groupsInfo.push({
-            tipo,
-            cantidad,
-            peso: pesoSeleccionado,
-            pesoOriginal,
-            ids,
-            personas,
-            registros: registrosAjustados,
-            proporcionDespachada: proporcion
+            tipo: tipo,
+            peso: pesoSeleccionado
         });
     });
     
@@ -1351,7 +1074,7 @@ function getSelectedGroupsInfoWithCustomWeights() {
 async function handleSalidaSubmit(e) {
     e.preventDefault();
     
-    // Validar todos los inputs de peso primero
+    // Validar inputs de peso
     const checkboxes = document.querySelectorAll('#registros-disponibles input[type="checkbox"]:checked');
     let todosValidos = true;
     
@@ -1368,220 +1091,120 @@ async function handleSalidaSubmit(e) {
         return;
     }
     
-    const registrosSeleccionados = getSelectedRegistros();
-    const gruposSeleccionados = getSelectedGroupsInfoWithCustomWeights(); // Usar la nueva función
+    const gruposSeleccionados = getSelectedGroupsInfoWithCustomWeights();
     
-    if (registrosSeleccionados.length === 0) {
+    if (gruposSeleccionados.length === 0) {
         showToast('Advertencia', 'Selecciona al menos un grupo de registros para procesar', 'warning');
         return;
     }
     
-    // Crear mensaje detallado de confirmación con pesos personalizados
+    // Mensaje de confirmación 
     let confirmMessage = '¿Confirmas el despacho de los siguientes grupos?\n\n';
+    confirmMessage += '⚠️ IMPORTANTE: Se despachará del registro más antiguo (menor ID) primero\n\n';
+    
     gruposSeleccionados.forEach(grupo => {
-        confirmMessage += `📦 ${grupo.tipo}: `;
-        if (grupo.peso < grupo.pesoOriginal) {
-            confirmMessage += `${grupo.peso.toFixed(1)}kg de ${grupo.pesoOriginal.toFixed(1)}kg disponibles\n`;
-        } else {
-            confirmMessage += `${grupo.peso.toFixed(1)}kg (completo)\n`;
-        }
-        confirmMessage += `👥 Personas: ${grupo.personas.join(', ')}\n`;
-        confirmMessage += `📢 IDs: ${grupo.ids.map(id => `#${id}`).join(', ')}\n\n`;
+        confirmMessage += `📦 ${grupo.tipo}: ${grupo.peso.toFixed(2)}kg\n`;
+        // Mostrar orden de despacho
+        const registrosDelGrupo = registrosData
+            .filter(r => r.Tipo === grupo.tipo && r.Estado === 'Activo')
+            .sort((a, b) => a.ID - b.ID)
+            .slice(0, 3);
+        
+        registrosDelGrupo.forEach((r, i) => {
+            if (i === 0) confirmMessage += `  ➡️ Primero: #${r.ID} (${(r.Peso_Restante || r.Peso).toFixed(2)}kg)\n`;
+            else confirmMessage += `  • Luego: #${r.ID} (${(r.Peso_Restante || r.Peso).toFixed(2)}kg)\n`;
+        });
     });
     
     // Mostrar confirmación
     showConfirmation(
-        'Confirmar Despacho',
+        'Confirmar el Despacho',
         confirmMessage,
-        () => procesarSalidaGrupalConPesosPersonalizados(registrosSeleccionados, gruposSeleccionados)
+        () => procesarSalidaFIFO(gruposSeleccionados)
     );
 }
 
-/**
- * Procesar salida grupal con pesos personalizados 
- */
-async function procesarSalidaGrupalConPesosPersonalizados(registrosSeleccionados, gruposSeleccionados) {
-    showLoading('Procesando salida con pesos personalizados...');
+// nueva funcion
+async function procesarSalidaFIFO(gruposSeleccionados) {
+    showLoading('Procesando salida...');
 
     try {
-        const salidaData = {
-            registrosIds: registrosSeleccionados,
-            grupos: gruposSeleccionados,
-            fechaSalida: document.getElementById('fecha-salida').value,
-            personaAutoriza: document.getElementById('persona-autoriza').value,
-            observaciones: document.getElementById('observaciones-salida').value
-        };
+        const fechaSalida = document.getElementById('fecha-salida').value;
+        const personaAutoriza = document.getElementById('persona-autoriza').value;
+        const observaciones = document.getElementById('observaciones-salida').value;
 
-        console.log('📤 Procesando salida con pesos personalizados:', salidaData);
-
-        // IMPORTANTE: Crear array para tracking de registros modificados
-        const registrosModificados = [];
-        const registrosParcialesInfo = [];
-
-        // Procesar cada grupo ANTES de crear la salida
-        gruposSeleccionados.forEach(grupo => {
-            // Agregar info de TODOS los despachos (parciales y completos)
-            grupo.registros.forEach(registro => {
-                registrosParcialesInfo.push({
-                    id: registro.ID,
-                    pesoOriginal: registro.PesoOriginal || registro.Peso,
-                    pesoDespachado: parseFloat(registro.PesoDespachado || grupo.peso / grupo.registros.length),
-                    pesoRestante: parseFloat(registro.PesoRestante || 0)
+        const resultadosPorGrupo = [];
+        let todosExitosos = true;
+        
+        // Procesar cada grupo con FIFO
+        for (const grupo of gruposSeleccionados) {
+            if (window.electronAPI) {
+                const resultado = await window.electronAPI.procesarSalidaFIFO({
+                    tipoMaterial: grupo.tipo,
+                    pesoSolicitado: grupo.peso,
+                    fechaSalida: fechaSalida,
+                    personaAutoriza: personaAutoriza,
+                    observaciones: observaciones
                 });
-            });
-            
-            if (grupo.proporcionDespachada < 1) {
-                // DESPACHO PARCIAL
-                grupo.registros.forEach(registro => {
-                    const reg = registrosData.find(r => r.ID === registro.ID);
-                    if (reg) {
-                        if (parseFloat(registro.PesoRestante) > 0) {
-                            // NO modificar el peso original, solo el estado
-                            reg.Estado = 'Activo';
-                            reg.PesoOriginal = reg.PesoOriginal || registro.PesoOriginal || reg.Peso;
-                            reg.Peso = parseFloat(registro.PesoRestante);
-
-                            registrosModificados.push({
-                                id: reg.ID,
-                                mantenerActivo: true,
-                                pesoRestante: reg.Peso
-                            });
-                        } else {
-                            reg.Estado = 'Despachado';
-                            registrosModificados.push({
-                                id: reg.ID,
-                                mantenerActivo: false,
-                                pesoRestante: 0
-                            });
-                        }
-                    }
-                });
-            } else {
-                // DESPACHO COMPLETO
-                grupo.ids.forEach(id => {
-                    const reg = registrosData.find(r => r.ID === id);
-                    if (reg) {
-                        reg.Estado = 'Despachado';
-                        registrosModificados.push({
-                            id: reg.ID,
-                            mantenerActivo: false,
-                            pesoRestante: 0
-                        });
-                    }
-                });
+                
+                if (resultado.success) {
+                    resultadosPorGrupo.push({
+                        tipo: grupo.tipo,
+                        peso: grupo.peso,
+                        detalles: resultado.detalles || []
+                    });
+                } else {
+                    todosExitosos = false;
+                    hideLoading();
+                    showToast('Error', resultado.message, 'error');
+                    return;
+                }
             }
-        });
+        }
 
-        // Crear registro de salida con información detallada
-        const nuevaSalida = {
-            ID_Salida: getNextSalidaId(),
-            Fecha_Despacho: salidaData.fechaSalida,
-            Persona_Autoriza: salidaData.personaAutoriza,
-            Registros_Procesados: registrosSeleccionados.length,
-            Grupos_Procesados: gruposSeleccionados.length,
-            Tipos_Despachados: gruposSeleccionados.map(g => g.tipo).join(', '),
-            Peso_Total_Despachado: gruposSeleccionados.reduce((sum, g) => sum + g.peso, 0),
-            Observaciones: salidaData.observaciones,
-            Detalle_Grupos: gruposSeleccionados.map(grupo => ({
-                tipo: grupo.tipo,
-                cantidad: grupo.cantidad,
-                peso: grupo.peso,
-                pesoOriginal: grupo.pesoOriginal,
-                ids: grupo.ids,
-                personas: grupo.personas || [],
-                proporcionDespachada: grupo.proporcionDespachada
-            })),
-            // IMPORTANTE: Agregar info de parciales
-            RegistrosParciales: registrosParcialesInfo
-        };
-
-        console.log('Nueva salida creada:', nuevaSalida);
-        console.log('Registros parciales:', registrosParcialesInfo);
-
-        // Enviar a Excel con información de parciales
-        if (window.electronAPI) {
-            const result = await window.electronAPI.procesarSalidaConParciales({
-                salida: nuevaSalida,
-                registrosModificados: registrosModificados,
-                registrosParcialesInfo: registrosParcialesInfo
-            });
-
-            if (result.success) {
-                console.log('✅ Salida procesada en Excel con parciales');
-            }
-
+        if (todosExitosos) {
             // Recargar datos desde Excel
-            const loadResult = await window.electronAPI.loadDataFromExcel();
-            if (loadResult.success && loadResult.data) {
-                // Limpiar arrays
-                registrosData.length = 0;
-                registrosData.push(...(loadResult.data.registros || []));
-                
-                salidasData.length = 0;
-                salidasData.push(...(loadResult.data.salidas || []));
-                
-                // IMPORTANTE: Asegurar que RegistrosParciales se preserve
-                salidasData.forEach(salida => {
-                    if (!salida.RegistrosParciales && salida.Detalle_Grupos) {
-                        salida.RegistrosParciales = [];
-                        salida.Detalle_Grupos.forEach(grupo => {
-                            const pesoPorRegistro = grupo.peso / grupo.ids.length;
-                            grupo.ids.forEach(id => {
-                                salida.RegistrosParciales.push({
-                                    id: id,
-                                    pesoDespachado: pesoPorRegistro
-                                });
-                            });
-                        });
-                    }
-                });
-                
-                // Restaurar estados correctos
-                registrosModificados.forEach(mod => {
-                    const reg = registrosData.find(r => r.ID === mod.id);
-                    if (reg && mod.mantenerActivo) {
-                        reg.Estado = 'Activo';
-                        // Mantener peso original, no modificarlo
-                        if (!reg.PesoOriginal) {
-                            reg.PesoOriginal = reg.Peso;
-                        }
-                    }
-                });
+            if (window.electronAPI) {
+                const loadResult = await window.electronAPI.loadDataFromExcel();
+                if (loadResult.success && loadResult.data) {
+                    registrosData.length = 0;
+                    registrosData.push(...(loadResult.data.registros || []));
+                    salidasData.length = 0;
+                    salidasData.push(...(loadResult.data.salidas || []));
+                }
             }
-        } else {
-            // Sin Excel, solo actualizar memoria
-            salidasData.push(nuevaSalida);
+
+            hideLoading();
+
+            // Mensaje de éxito detallado
+            let successMessage = '✅ Salida procesada correctamente:\n\n';
+            resultadosPorGrupo.forEach(resultado => {
+                successMessage += `📦 ${resultado.tipo}: ${resultado.peso.toFixed(2)}kg despachados\n`;
+                if (resultado.detalles && resultado.detalles.length > 0) {
+                    resultado.detalles.forEach(detalle => {
+                        successMessage += `  • Registro #${detalle.idRegistro}: ${detalle.pesoDespachado.toFixed(2)}kg\n`;
+                    });
+                }
+            });
+
+            showToast('Éxito', successMessage, 'success');
+
+            // Actualizar vistas
+            updateDashboard();
+            loadSalidasData();
+            
+            if (currentSection === 'historial') {
+                loadHistorialData();
+            }
+
+            // Limpiar formulario
+            document.getElementById('form-salida').reset();
+            setupDateTimeInputs();
         }
-
-        hideLoading();
-
-        // Mensaje de éxito
-        const pesoTotal = gruposSeleccionados.reduce((sum, g) => sum + g.peso, 0);
-        let successMessage = `Salida #${nuevaSalida.ID_Salida} procesada:\n`;
-        successMessage += `• ${pesoTotal.toFixed(1)}kg despachados`;
-        
-        const registrosConRestante = registrosModificados.filter(r => r.mantenerActivo);
-        if (registrosConRestante.length > 0) {
-            successMessage += `\n• ${registrosConRestante.length} registro(s) con peso restante activo`;
-        }
-
-        showToast('Éxito', successMessage, 'success');
-
-        // Actualizar vistas
-        updateDashboard();
-        loadSalidasData();
-        
-        if (currentSection === 'historial') {
-            loadHistorialData();
-        }
-
-        // Limpiar formulario
-        document.getElementById('form-salida').reset();
-        setupDateTimeInputs();
         
     } catch (error) {
         hideLoading();
-        console.error('❌ Error al procesar salida:', error);
+        console.error('Error al procesar salida:', error);
         showToast('Error', 'Ocurrió un error al procesar la salida', 'error');
     }
 }
@@ -1959,7 +1582,7 @@ function calculateAdvancedStats() {
 }
 
 /**
- * Actualizar tarjetas de peso por tipo en reportes (NUEVA FUNCIÓN)
+ * Actualizar tarjetas de peso por tipo en reportes 
  */
 function updateReportesPorTipo() {
     const pesosPorTipo = calculatePesosPorTipoReportes();
@@ -1988,7 +1611,7 @@ function updateReportesPorTipo() {
     console.log('📊 Tarjetas de reportes por tipo actualizadas:', pesosPorTipo);
 }
 /**
- * Calcular peso total por tipo para reportes (NUEVA FUNCIÓN)
+ * Calcular peso total por tipo para reportes 
  */
 function calculatePesosPorTipoReportes() {
     const pesosPorTipo = {
@@ -2005,8 +1628,8 @@ function calculatePesosPorTipoReportes() {
     // Sumar pesos solo de registros activos
     registrosData.forEach(registro => {
         if (registro.Estado === 'Activo' && pesosPorTipo.hasOwnProperty(registro.Tipo)) {
-            // Usar PesoDisponible si existe, sino usar Peso
-            const pesoAUsar = registro.PesoDisponible !== undefined ? registro.PesoDisponible : registro.Peso;
+            // Usar Peso_Restante si existe, sino usar Peso_Inicial, y como último opcion usar Peso
+            const pesoAUsar = registro.Peso_Restante || registro.Peso_Inicial || registro.Peso || 0;
             pesosPorTipo[registro.Tipo] += pesoAUsar;
         }
     });
@@ -2577,3 +2200,5 @@ window.mostrarDetallesTipoReporte = mostrarDetallesTipoReporte;
 window.handleGrupoSelection = handleGrupoSelection;
 window.validarPesoInput = validarPesoInput;
 window.confirmarPesoInput = confirmarPesoInput;
+window.procesarSalidaFIFO = procesarSalidaFIFO;
+window.handleGrupoCheckbox = handleGrupoCheckbox;
