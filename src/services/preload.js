@@ -134,8 +134,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     const registrosHeaders = [[
                         'ID', 
                         'Tipo', 
-                        'Peso_Inicial',     // Nuevo
-                        'Peso_Restante',    // Nuevo
+                        'Peso_Inicial',
+                        'Peso_Restante',    
                         'Fecha_Registro', 
                         'Persona', 
                         'Estado', 
@@ -145,7 +145,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                         'ID_Salida', 
                         'ID_Registro', 
                         'Tipo', 
-                        'Peso_Despachado',  // Más claro
+                        'Peso_Despachado',  
                         'Fecha_Despacho', 
                         'Persona_Autoriza', 
                         'Observaciones'

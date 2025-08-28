@@ -246,7 +246,7 @@ function setupNavigation() {
 }
 
 /**
- * Navegar a una sección específica - VERSIÓN SIMPLIFICADA
+ * Navegar a una sección específica 
  */
 function navigateToSection(sectionName) {
     console.log(`🧭 Navegando a: ${sectionName}`);
@@ -1568,7 +1568,7 @@ function calculateAdvancedStats() {
         totalRegistros: registrosData.length,
         registrosActivos: registrosData.filter(r => r.Estado === 'Activo').length,
         registrosDespachados: registrosData.filter(r => r.Estado === 'Despachado').length,
-        pesoTotal: registrosData.reduce((sum, r) => sum + r.Peso, 0),
+        pesoTotal: registrosData.reduce((sum, r) => sum + (r.Peso_Inicial || r.Peso_Restante || 0), 0),
         totalSalidas: salidasData.length,
         pesoPromedio: 0
     };
@@ -1649,7 +1649,7 @@ function mostrarDetallesTipoReporte(tipo) {
     }
     
     // Calcular estadísticas del tipo
-    const totalPeso = registrosTipo.reduce((sum, r) => sum + r.Peso, 0);
+    const totalPeso = registrosTipo.reduce((sum, r) => sum + (r.Peso_Inicial || r.Peso_Restante || 0), 0);
     const registrosActivos = registrosTipo.filter(r => r.Estado === 'Activo').length;
     const registrosDespachados = registrosTipo.filter(r => r.Estado === 'Despachado').length;
     const personas = [...new Set(registrosTipo.map(r => r.Persona))];
@@ -1666,7 +1666,7 @@ function mostrarDetallesTipoReporte(tipo) {
             };
         }
         estadisticasPorPersona[registro.Persona].cantidad++;
-        estadisticasPorPersona[registro.Persona].peso += registro.Peso;
+        estadisticasPorPersona[registro.Persona].peso += (registro.Peso_Inicial || registro.Peso_Restante || 0);
         if (registro.Estado === 'Activo') {
             estadisticasPorPersona[registro.Persona].activos++;
         } else {
@@ -1758,7 +1758,7 @@ function mostrarDetallesTipoReporte(tipo) {
             <div class="flex justify-between items-center p-3 bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors">
                 <div class="flex items-center space-x-3">
                     <span class="font-mono text-blue-400">#${registro.ID}</span>
-                    <span class="text-yellow-400 font-semibold">${registro.Peso}kg</span>
+                    <span class="text-yellow-400 font-semibold">${(registro.Peso_Inicial || registro.Peso_Restante || 0).toFixed(1)}kg</span>
                     <span class="text-gray-300">${registro.Persona}</span>
                 </div>
                 <div class="text-right">

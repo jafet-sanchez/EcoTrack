@@ -158,11 +158,14 @@ function mostrarDetallesTipoReporte(tipo) {
  */
 function getTipoIcon(tipo) {
     const icons = {
-        'Plástico': '♻️',
+        'Plega': '📑',
         'Cartón': '📦',
-        'Vidrio': '🍾',
-        'Metal': '🔧',
-        'Otros': '📄'
+        'Centro plástico Alta': '🏭',
+        'Plástico limpio': '🧴',
+        'Archivo': '📄',
+        'Polipropileno': '🛍️',
+        'Estopas': '🧽',
+        'PET': '🥤'
     };
     return icons[tipo] || '📄';
 }
@@ -192,7 +195,7 @@ function formatDateTime(dateTimeString) {
  */
 function mostrarNotificacionNuevoRegistro(registro) {
     const tipoIcon = getTipoIcon(registro.Tipo);
-    const mensaje = `${tipoIcon} ${registro.Tipo} - ${registro.Peso}kg registrado por ${registro.Persona}`;
+    const mensaje = `${tipoIcon} ${registro.Tipo} - ${registro.Peso_Inicial}kg registrado por ${registro.Persona}`;
     
     if (typeof showToast === 'function') {
         showToast('Nuevo Registro', mensaje, 'success');
