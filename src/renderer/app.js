@@ -1110,10 +1110,10 @@ async function handleSalidaSubmit(e) {
             .sort((a, b) => a.ID - b.ID)
             .slice(0, 3);
         
-        registrosDelGrupo.forEach((r, i) => {
-            if (i === 0) confirmMessage += `  ➡️ Primero: #${r.ID} (${(r.Peso_Restante || r.Peso).toFixed(2)}kg)\n`;
-            else confirmMessage += `  • Luego: #${r.ID} (${(r.Peso_Restante || r.Peso).toFixed(2)}kg)\n`;
-        });
+        //registrosDelGrupo.forEach((r, i) => {
+            //if (i === 0) confirmMessage += `  ➡️ Primero: #${r.ID} (${(r.Peso_Restante || r.Peso).toFixed(2)}kg)\n`;
+            //else confirmMessage += `  • Luego: #${r.ID} (${(r.Peso_Restante || r.Peso).toFixed(2)}kg)\n`;
+        //});
     });
     
     // Mostrar confirmación

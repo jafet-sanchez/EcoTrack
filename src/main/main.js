@@ -112,13 +112,13 @@ function setupMenu() {
     {
       label: 'Ver',
       submenu: [
-        {
+        /**{
           label: 'Abrir DevTools',
             accelerator: 'F12',
             click: () => {
                 mainWindow.webContents.openDevTools();
               }
-        },
+        },**/
         {
           label: 'Recargar',
           accelerator: 'CmdOrCtrl+R',
